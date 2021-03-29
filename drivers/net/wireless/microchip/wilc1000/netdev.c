@@ -1216,7 +1216,6 @@ void wilc_netdev_cleanup(struct wilc *wilc)
 	wilc_sysfs_exit();
 	wlan_deinit_locks(wilc);
 }
-EXPORT_SYMBOL_GPL(wilc_netdev_cleanup);
 
 static u8 wilc_get_available_idx(struct wilc *wl)
 {
