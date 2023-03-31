@@ -1044,6 +1044,9 @@ static int wilc_mac_close(struct net_device *ndev)
 		return 0;
 	}
 
+	if (wl->open_ifcs == 0)
+		wl->close = 1;
+
 	if (vif->ndev) {
 		netif_stop_queue(vif->ndev);
 
@@ -1055,7 +1058,6 @@ static int wilc_mac_close(struct net_device *ndev)
 
 	if (wl->open_ifcs == 0) {
 		netdev_dbg(ndev, "Deinitializing wilc\n");
-		wl->close = 1;
 		wilc_wlan_deinitialize(ndev);
 	}
 
