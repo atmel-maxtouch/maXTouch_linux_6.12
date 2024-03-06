@@ -502,6 +502,7 @@
 				dma-names = "tx";
 				clocks = <&pmc PMC_TYPE_PERIPHERAL 41>;
 				clock-names = "sha_clk";
+				status = "disabled";
 			};
 
 			trng: rng@f0030000 {
