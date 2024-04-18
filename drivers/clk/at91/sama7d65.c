@@ -510,7 +510,8 @@ static struct {
 	  .ep = { PLL_IDS_TO_ARR_ENTRY(SYS, DIV0), },
 	  .ep_mux_table = { 5, },
 	  .ep_count = 1,
-	  .ep_chg_id = INT_MIN,},
+	  .ep_chg_id = INT_MIN,
+	  .c = 1,},
 
 	{ .n = "mck6",
 	  .id = 6,
@@ -613,6 +614,7 @@ static struct {
 	u8 id;
 } sama7d65_periphck[] = {
 	{ .n = "pioA_clk",	.p = PCK_PARENT_HW_MCK0, .id = 10, },
+	{ .n = "securam_clk",   .p = PCK_PARENT_HW_MCK0, .id = 17, },
 	{ .n = "sfr_clk",	.p = PCK_PARENT_HW_MCK7, .id = 18, },
 	{ .n = "hsmc_clk",	.p = PCK_PARENT_HW_MCK5, .id = 20, },
 	{ .n = "xdmac0_clk",	.p = PCK_PARENT_HW_MCK6, .id = 21, },
