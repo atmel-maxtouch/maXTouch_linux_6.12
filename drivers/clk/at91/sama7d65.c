@@ -556,15 +556,15 @@ static const struct {
 	const char *p;
 	u8 id;
 } sama7d65_systemck[] = {
-	{ .n = "uhpck", .id = 6 },
-	{ .n = "pck0",  .id = 8, },
-	{ .n = "pck1",  .id = 9, },
-	{ .n = "pck2",  .id = 10, },
-	{ .n = "pck3",  .id = 11, },
-	{ .n = "pck4",  .id = 12, },
-	{ .n = "pck5",  .id = 13, },
-	{ .n = "pck6",  .id = 14, },
-	{ .n = "pck7",  .id = 15, },
+	{ .n = "uhpck",		.p = "usbck", .id = 6 },
+	{ .n = "pck0",		.p = "prog0", .id = 8, },
+	{ .n = "pck1",		.p = "prog1", .id = 9, },
+	{ .n = "pck2",		.p = "prog2", .id = 10, },
+	{ .n = "pck3",		.p = "prog3", .id = 11, },
+	{ .n = "pck4",		.p = "prog4", .id = 12, },
+	{ .n = "pck5",		.p = "prog5", .id = 13, },
+	{ .n = "pck6",		.p = "prog6", .id = 14, },
+	{ .n = "pck7",		.p = "prog7", .id = 15, },
 };
 
 /* Mux table for programmable clocks. */
@@ -1300,7 +1300,7 @@ static void __init sama7d65_pmc_setup(struct device_node *np)
 
 	for (i = 0; i < ARRAY_SIZE(sama7d65_systemck); i++) {
 		hw = at91_clk_register_system(regmap, sama7d65_systemck[i].n,
-					      NULL, sama7d65_pmc->pchws[i],
+					      sama7d65_systemck[i].p, NULL,
 					      sama7d65_systemck[i].id, 0);
 		if (IS_ERR(hw))
 			goto err_free;
@@ -1327,7 +1327,7 @@ static void __init sama7d65_pmc_setup(struct device_node *np)
 	parent_hws[0] = md_slck_hw;
 	parent_hws[1] = td_slck_hw;
 	parent_hws[2] = sama7d65_pmc->chws[PMC_MAIN];
-	parent_hws[2] = sama7d65_pmc->chws[PMC_MCK1];
+	parent_hws[3] = sama7d65_pmc->chws[PMC_MCK1];
 	for (i = 0; i < ARRAY_SIZE(sama7d65_gck); i++) {
 		u8 num_parents = 4 + sama7d65_gck[i].pp_count;
 		struct clk_hw *tmp_parent_hws[8];
@@ -1347,7 +1347,7 @@ static void __init sama7d65_pmc_setup(struct device_node *np)
 
 			tmp_parent_hws[j] = sama7d65_plls[pll_id][pll_compid].hw;
 		}
-		SAMA7D65_FILL_TABLE(&parent_hws[3], tmp_parent_hws,
+		SAMA7D65_FILL_TABLE(&parent_hws[4], tmp_parent_hws,
 				   sama7d65_gck[i].pp_count);
 
 		hw = at91_clk_register_generated(regmap, &pmc_pcr_lock,
