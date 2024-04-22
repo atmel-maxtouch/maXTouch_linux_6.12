@@ -1422,6 +1422,7 @@ struct pmc_info {
 	unsigned long uhp_udp_mask;
 	unsigned long mckr;
 	unsigned long version;
+	unsigned long mck_count;
 };
 
 static const struct pmc_info pmc_infos[] __initconst = {
@@ -1429,30 +1430,42 @@ static const struct pmc_info pmc_infos[] __initconst = {
 		.uhp_udp_mask = AT91RM9200_PMC_UHP | AT91RM9200_PMC_UDP,
 		.mckr = 0x30,
 		.version = AT91_PMC_V1,
+		.mck_count = 1,
 	},
 
 	{
 		.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP,
 		.mckr = 0x30,
 		.version = AT91_PMC_V1,
+		.mck_count = 1,
 	},
 	{
 		.uhp_udp_mask = AT91SAM926x_PMC_UHP,
 		.mckr = 0x30,
 		.version = AT91_PMC_V1,
+		.mck_count = 1,
 	},
 	{	.uhp_udp_mask = 0,
 		.mckr = 0x30,
 		.version = AT91_PMC_V1,
+		.mck_count = 1,
 	},
 	{
 		.uhp_udp_mask = AT91SAM926x_PMC_UHP,
 		.mckr = 0x28,
 		.version = AT91_PMC_V2,
+		.mck_count = 1,
 	},
 	{
 		.mckr = 0x28,
 		.version = AT91_PMC_V2,
+		.mck_count = 5,
+	},
+	{
+		.uhp_udp_mask = AT91SAM926x_PMC_UHP,
+		.mckr = 0x28,
+		.version = AT91_PMC_V2,
+		.mck_count = 10,
 	},
 
 };
@@ -1471,7 +1484,7 @@ static const struct of_device_id atmel_pmc_ids[] __initconst = {
 	{ .compatible = "atmel,sama5d2-pmc", .data = &pmc_infos[1] },
 	{ .compatible = "microchip,sam9x60-pmc", .data = &pmc_infos[4] },
 	{ .compatible = "microchip,sam9x7-pmc", .data = &pmc_infos[4] },
-	{ .compatible = "microchip,sama7d65-pmc", .data = &pmc_infos[4] },
+	{ .compatible = "microchip,sama7d65-pmc", .data = &pmc_infos[6] },
 	{ .compatible = "microchip,sama7g5-pmc", .data = &pmc_infos[5] },
 	{ /* sentinel */ },
 };
@@ -1542,6 +1555,7 @@ static void __init at91_pm_init(void (*pm_idle)(void))
 	soc_pm.data.uhp_udp_mask = pmc->uhp_udp_mask;
 	soc_pm.data.pmc_mckr_offset = pmc->mckr;
 	soc_pm.data.pmc_version = pmc->version;
+	soc_pm.data.pmc_mck_count = pmc->mck_count;
 
 	if (pm_idle)
 		arm_pm_idle = pm_idle;
