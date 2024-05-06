@@ -526,16 +526,14 @@ static struct {
 	  .ep = { PLL_IDS_TO_ARR_ENTRY(SYS, DIV0), },
 	  .ep_mux_table = { 5, },
 	  .ep_chg_id = INT_MIN,
-	  .ep_count = 1,
-	  .c = 1,},
+	  .ep_count = 1,},
 
 	{ .n = "mck8",
 	  .id = 8,
 	  .ep = { PLL_IDS_TO_ARR_ENTRY(SYS, DIV0), },
 	  .ep_mux_table = { 5, },
 	  .ep_chg_id = INT_MIN,
-	  .ep_count = 1,
-	  .c = 1,},
+	  .ep_count = 1,},
 
 	{ .n = "mck9",
 	  .id = 9,
