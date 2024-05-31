@@ -512,6 +512,7 @@ static struct {
 	  .ep_mux_table = { 5, },
 	  .ep_count = 1,
 	  .ep_chg_id = INT_MIN,
+	  .eid = PMC_MCK5,
 	  .c = 1,},
 
 	{ .n = "mck6",
