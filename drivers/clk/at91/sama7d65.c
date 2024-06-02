@@ -1128,7 +1128,7 @@ static void __init sama7d65_pmc_setup(struct device_node *np)
 	if (IS_ERR(regmap))
 		return;
 
-	sama7d65_pmc = pmc_data_allocate(PMC_LVDSPLL + 1,
+	sama7d65_pmc = pmc_data_allocate(PMC_MCK5 + 1,
 					nck(sama7d65_systemck),
 					nck(sama7d65_periphck),
 					nck(sama7d65_gck), 8);
