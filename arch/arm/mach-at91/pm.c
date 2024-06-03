@@ -792,6 +792,9 @@ error:
 static void at91_pm_end(void)
 {
 	at91_pm_config_ws(soc_pm.data.mode, false);
+
+	if (IS_ENABLED(CONFIG_SOC_SAMA7D65))
+		readl(soc_pm.data.shdwc + 0x08);
 }
 
 
