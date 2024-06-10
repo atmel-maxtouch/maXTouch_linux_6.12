@@ -496,7 +496,8 @@ static struct {
 	  .ep_mux_table = { 5, 6, },
 	  .ep_count = 2,
 	  .ep_chg_id = INT_MIN,
-	  .eid = PMC_MCK3, },
+	  .eid = PMC_MCK3,
+	  .c = 1, },
 
 	{ .n = "mck4",
 	  .id = 4,
