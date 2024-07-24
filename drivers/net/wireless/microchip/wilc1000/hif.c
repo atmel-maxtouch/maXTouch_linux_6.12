@@ -4,6 +4,7 @@
  * All rights reserved.
  */
 
+#include "cfg80211.h"
 #include "netdev.h"
 
 #define WILC_HIF_SCAN_TIMEOUT_MS                5000
@@ -866,7 +867,6 @@ static void handle_rcvd_gnrl_async_info(struct work_struct *work)
 		goto free_msg;
 	}
 
-
         if (hif_drv->hif_state == HOST_IF_EXTERNAL_AUTH) {
                 cfg80211_external_auth_request(vif->ndev, &vif->auth,
 					       GFP_KERNEL);
@@ -1305,7 +1305,7 @@ static void handle_scan_timer(struct work_struct *work)
 {
 	struct host_if_msg *msg = container_of(work, struct host_if_msg, work);
 
-	if(!msg->vif || !msg->vif->wilc || msg->vif->wilc->close)
+	if (!msg->vif || !msg->vif->wilc || msg->vif->wilc->close)
 		return;
 
 	handle_scan_done(msg->vif, SCAN_EVENT_ABORTED);
@@ -2061,9 +2061,9 @@ void wilc_frame_register(struct wilc_vif *vif, u16 frame_type, bool reg)
 		reg_frame.reg_id = WILC_FW_PROBE_REQ_IDX;
 		break;
 
-        case IEEE80211_STYPE_AUTH:
-                reg_frame.reg_id = WILC_FW_AUTH_REQ_IDX;
-                break;
+	case IEEE80211_STYPE_AUTH:
+		reg_frame.reg_id = WILC_FW_AUTH_REQ_IDX;
+		break;
 
 	default:
 		PRINT_INFO(vif->ndev, HOSTINF_DBG, "Not valid frame type\n");
@@ -2200,8 +2200,8 @@ int wilc_add_station(struct wilc_vif *vif, const u8 *mac,
 	sta_params->supported_rates_len = params->link_sta_params.supported_rates_len;
 	if (params->link_sta_params.supported_rates_len > 0) {
 		sta_params->supported_rates = kmemdup(params->link_sta_params.supported_rates,
-					    params->link_sta_params.supported_rates_len,
-					    GFP_KERNEL);
+						      params->link_sta_params.supported_rates_len,
+						      GFP_KERNEL);
 		if (!sta_params->supported_rates) {
 			kfree(msg);
 			return -ENOMEM;
@@ -2348,8 +2348,8 @@ int wilc_edit_station(struct wilc_vif *vif, const u8 *mac,
 	sta_params->supported_rates_len = params->link_sta_params.supported_rates_len;
 	if (params->link_sta_params.supported_rates_len > 0) {
 		sta_params->supported_rates = kmemdup(params->link_sta_params.supported_rates,
-					    params->link_sta_params.supported_rates_len,
-					    GFP_KERNEL);
+						      params->link_sta_params.supported_rates_len,
+						      GFP_KERNEL);
 		if (!sta_params->supported_rates) {
 			kfree(msg);
 			return -ENOMEM;
@@ -2577,4 +2577,16 @@ int wilc_set_antenna(struct wilc_vif *vif, u8 mode)
 		PRINT_ER(vif->ndev, "Failed to set antenna mode\n");
 
 	return ret;
+}
+
+void wilc_set_fw_debug_level(struct wilc *wl, u8 dbg_level)
+{
+	struct wilc_vif *vif = wilc_get_wl_to_vif(wl);
+	struct wid wid;
+
+	wid.id = WID_FW_PRINT_LEVEL;
+	wid.type = WID_CHAR;
+	wid.size = sizeof(char);
+	wid.val = &dbg_level;
+	wilc_send_config_pkt(vif, WILC_SET_CFG, &wid, 1);
 }
