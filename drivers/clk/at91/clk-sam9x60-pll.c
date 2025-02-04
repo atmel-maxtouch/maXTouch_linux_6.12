@@ -104,7 +104,8 @@ static int sam9x60_frac_pll_set(struct sam9x60_pll_core *core)
 		goto unlock;
 
 	/* Load recommended value for PMC_PLL_ACR */
-	regmap_write(regmap, AT91_PMC_PLL_ACR, core->characteristics->acr);
+	val = core->characteristics->acr;
+	regmap_write(regmap, AT91_PMC_PLL_ACR, val);
 
 	regmap_write(regmap, AT91_PMC_PLL_CTRL1,
 		     (frac->mul << core->layout->mul_shift) |
