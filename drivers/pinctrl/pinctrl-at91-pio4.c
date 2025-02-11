@@ -12,11 +12,13 @@
 #include <linux/gpio/driver.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/of_address.h>
 #include <linux/io.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
+#include <linux/clk/at91_pmc.h>
 
 #include <linux/pinctrl/pinconf-generic.h>
 #include <linux/pinctrl/pinconf.h>
@@ -128,6 +130,7 @@ struct atmel_pin {
  */
 struct atmel_pioctrl {
 	void __iomem		*reg_base;
+	void __iomem		*pmc;
 	struct clk		*clk;
 	unsigned int		nbanks;
 	struct pinctrl_dev	*pinctrl_dev;
@@ -434,6 +437,8 @@ static void atmel_gpio_set_multiple(struct gpio_chip *chip, unsigned long *mask,
 }
 
 static struct gpio_chip atmel_gpio_chip = {
+	.request		= gpiochip_generic_request,
+	.free			= gpiochip_generic_free,
 	.direction_input        = atmel_gpio_direction_input,
 	.get                    = atmel_gpio_get,
 	.get_multiple           = atmel_gpio_get_multiple,
@@ -717,11 +722,27 @@ static int atmel_pmx_set_mux(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
+static int atmel_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
+					 struct pinctrl_gpio_range *range,
+					 unsigned offset)
+{
+	u32 conf;
+
+	conf = atmel_pin_config_read(pctldev, offset);
+	conf &= (~ATMEL_PIO_CFGR_FUNC_MASK);
+	atmel_pin_config_write(pctldev, offset, conf);
+
+	dev_dbg(pctldev->dev, "enable pin %u as GPIO\n", offset);
+
+	return 0;
+}
+
 static const struct pinmux_ops atmel_pmxops = {
 	.get_functions_count	= atmel_pmx_get_functions_count,
 	.get_function_name	= atmel_pmx_get_function_name,
 	.get_function_groups	= atmel_pmx_get_function_groups,
 	.set_mux		= atmel_pmx_set_mux,
+	.gpio_request_enable	= atmel_pmx_gpio_request_enable,
 };
 
 static int atmel_conf_pin_config_group_get(struct pinctrl_dev *pctldev,
@@ -1007,6 +1028,10 @@ static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
 			atmel_pioctrl->pm_suspend_backup[i].cfgr[j] =
 				atmel_gpio_read(atmel_pioctrl, i,
 						ATMEL_PIO_CFGR);
+			if (atmel_pioctrl->pm_wakeup_sources[i] & BIT(j) && atmel_pioctrl->pmc)
+				writel_relaxed((j + i * ATMEL_PIO_NPINS_PER_BANK) | AT91_PMC_WCR_CMD |
+						AT91_PMC_WCR_EN, atmel_pioctrl->pmc + AT91_PMC_WCR);
+
 		}
 	}
 
@@ -1028,6 +1053,11 @@ static int __maybe_unused atmel_pctrl_resume(struct device *dev)
 					 ATMEL_PIO_MSKR, BIT(j));
 			atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_CFGR,
 					 atmel_pioctrl->pm_suspend_backup[i].cfgr[j]);
+
+			if (atmel_pioctrl->pm_wakeup_sources[i] & BIT(j) && atmel_pioctrl->pmc)
+				writel_relaxed((j + i * ATMEL_PIO_NPINS_PER_BANK) | AT91_PMC_WCR_CMD |
+						~AT91_PMC_WCR_EN, atmel_pioctrl->pmc + AT91_PMC_WCR);
+
 		}
 	}
 
@@ -1035,7 +1065,7 @@ static int __maybe_unused atmel_pctrl_resume(struct device *dev)
 }
 
 static const struct dev_pm_ops atmel_pctrl_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(atmel_pctrl_suspend, atmel_pctrl_resume)
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(atmel_pctrl_suspend, atmel_pctrl_resume)
 };
 
 /*
@@ -1053,6 +1083,12 @@ static const struct atmel_pioctrl_data microchip_sama7g5_pioctrl_data = {
 	.slew_rate_support	= 1,
 };
 
+static const struct atmel_pioctrl_data microchip_sama7d65_pioctrl_data = {
+	.nbanks			= 5,
+	.last_bank_count	= 14, /* sama7d65 has only PE0 to PE13 */
+	.slew_rate_support	= 1,
+};
+
 static const struct of_device_id atmel_pctrl_of_match[] = {
 	{
 		.compatible = "atmel,sama5d2-pinctrl",
@@ -1061,8 +1097,17 @@ static const struct of_device_id atmel_pctrl_of_match[] = {
 		.compatible = "microchip,sama7g5-pinctrl",
 		.data = &microchip_sama7g5_pioctrl_data,
 	}, {
+		.compatible = "microchip,sama7d65-pinctrl",
+		.data = &microchip_sama7d65_pioctrl_data,
+	}, {
 		/* sentinel */
 	}
+};
+
+static const struct of_device_id atmel_pmc_of_match[] __refconst = {
+	{ .compatible = "microchip,sama7d65-pmc",},
+	{ .compatible = "microchip,sama7g5-pmc",},
+	{ /* sentinel */ }
 };
 
 /*
@@ -1075,6 +1120,7 @@ static struct lock_class_key atmel_request_key;
 static int atmel_pinctrl_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	struct device_node *pmc_np;
 	struct pinctrl_pin_desc	*pin_desc;
 	const char **group_names;
 	int i, ret;
@@ -1164,6 +1210,10 @@ static int atmel_pinctrl_probe(struct platform_device *pdev)
 
 		dev_dbg(dev, "pin_id=%u, bank=%u, line=%u", i, bank, line);
 	}
+
+	pmc_np = of_find_matching_node(NULL, atmel_pmc_of_match);
+	atmel_pioctrl->pmc = of_iomap(pmc_np, 0);
+	of_node_put(pmc_np);
 
 	atmel_pioctrl->gpio_chip = &atmel_gpio_chip;
 	atmel_pioctrl->gpio_chip->ngpio = atmel_pioctrl->npins;
