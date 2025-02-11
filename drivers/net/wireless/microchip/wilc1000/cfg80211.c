@@ -1743,6 +1743,31 @@ static int get_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
 	return ret;
 }
 
+static int set_antenna(struct wiphy *wiphy, u32 tx_ant, u32 rx_ant)
+{
+	int ret;
+	struct wilc *wl = wiphy_priv(wiphy);
+	struct wilc_vif *vif;
+	int srcu_idx;
+
+	srcu_idx = srcu_read_lock(&wl->srcu);
+	vif = wilc_get_wl_to_vif(wl);
+	if (IS_ERR(vif)) {
+		srcu_read_unlock(&wl->srcu, srcu_idx);
+		return -EINVAL;
+	}
+
+	if (!tx_ant || !rx_ant) {
+		srcu_read_unlock(&wl->srcu, srcu_idx);
+		return -EINVAL;
+	}
+
+	ret = wilc_set_antenna(vif, (u8)(tx_ant - 1));
+	srcu_read_unlock(&wl->srcu, srcu_idx);
+
+	return ret;
+}
+
 static const struct cfg80211_ops wilc_cfg80211_ops = {
 	.set_monitor_channel = set_channel,
 	.scan = scan,
@@ -1783,7 +1808,7 @@ static const struct cfg80211_ops wilc_cfg80211_ops = {
 	.set_wakeup = wilc_set_wakeup,
 	.set_tx_power = set_tx_power,
 	.get_tx_power = get_tx_power,
-
+	.set_antenna = set_antenna,
 };
 
 static void wlan_init_locks(struct wilc *wl)
@@ -1852,6 +1877,8 @@ static struct wilc *wilc_create_wiphy(struct device *dev)
 	       sizeof(wilc_cipher_suites));
 	wiphy->cipher_suites = wl->cipher_suites;
 	wiphy->n_cipher_suites = ARRAY_SIZE(wilc_cipher_suites);
+	wiphy->available_antennas_tx = 0x3;
+	wiphy->available_antennas_rx = 0x3;
 	wiphy->mgmt_stypes = wilc_wfi_cfg80211_mgmt_types;
 
 	wiphy->max_remain_on_channel_duration = 500;
@@ -1927,6 +1954,8 @@ int wilc_init_host_int(struct net_device *net)
 	struct wilc_vif *vif = netdev_priv(net);
 	struct wilc_priv *priv = &vif->priv;
 
+	timer_setup(&priv->eap_buff_timer, eap_buff_timeout, 0);
+
 	vif->p2p_listen_state = false;
 
 	mutex_init(&priv->scan_req_lock);
@@ -1948,6 +1977,8 @@ void wilc_deinit_host_int(struct net_device *net)
 	flush_workqueue(vif->wilc->hif_workqueue);
 	mutex_destroy(&priv->scan_req_lock);
 	ret = wilc_deinit(vif);
+
+	del_timer_sync(&priv->eap_buff_timer);
 
 	if (ret)
 		netdev_err(net, "Error while deinitializing host interface\n");
