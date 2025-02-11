@@ -65,6 +65,12 @@ struct wilc_wfi_p2p_listen_params {
 	u64 listen_cookie;
 };
 
+struct wilc_p2p_var {
+	u8 local_random;
+	u8 recv_random;
+	bool is_wilc_ie;
+};
+
 static const u32 wilc_cipher_suites[] = {
 	WLAN_CIPHER_SUITE_TKIP,
 	WLAN_CIPHER_SUITE_CCMP,
@@ -143,9 +149,8 @@ struct wilc_priv {
 
 	/* mutexes */
 	struct mutex scan_req_lock;
-	bool p2p_listen_state;
 	int scanned_cnt;
-
+	struct wilc_p2p_var p2p;
 	u64 inc_roc_cookie;
 };
 
@@ -175,6 +180,9 @@ struct tcp_ack_filter {
 	bool enabled;
 };
 
+#define WILC_P2P_ROLE_GO	1
+#define WILC_P2P_ROLE_CLIENT	0
+
 struct wilc_vif {
 	u8 idx;
 	u8 iftype;
@@ -193,6 +201,7 @@ struct wilc_vif {
 	bool connecting;
 	struct wilc_priv priv;
 	struct list_head list;
+	bool p2p_listen_state;
 	struct cfg80211_bss *bss;
 	struct cfg80211_external_auth_params auth;
 };
