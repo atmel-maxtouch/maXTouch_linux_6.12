@@ -38,6 +38,8 @@
 
 #define ETH_CONFIG_PKT_HDR_OFFSET	(ETH_ETHERNET_HDR_OFFSET + \
 					 ETH_CONFIG_PKT_HDR_LEN)
+#define PKT_STATUS_NEW          0
+#define PKT_STATUS_BUFFERED     1
 
 /********************************************
  *
@@ -472,6 +474,7 @@ int host_wakeup_notify(struct wilc *wilc);
 int host_sleep_notify(struct wilc *wilc);
 int wilc_send_config_pkt(struct wilc_vif *vif, u8 mode, struct wid *wids,
 			 u32 count);
+void eap_buff_timeout(struct timer_list *t);
 int wilc_wlan_init(struct net_device *dev);
 int wilc_get_chipid(struct wilc *wilc);
 int wilc_load_mac_from_nv(struct wilc *wilc);
