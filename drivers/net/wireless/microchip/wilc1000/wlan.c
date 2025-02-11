@@ -843,6 +843,11 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 	struct wilc_vif *vif;
 	int rv;
 
+	if (!wilc->txq_entries) {
+		*txq_count = 0;
+		return 0;
+	}
+
 	if (wilc->quit)
 		goto out_update_cnt;
 

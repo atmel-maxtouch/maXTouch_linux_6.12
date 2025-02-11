@@ -916,10 +916,29 @@ static int wilc_sdio_sync_ext(struct wilc *wilc, int nint)
 {
 	struct sdio_func *func = dev_to_sdio_func(wilc->dev);
 	struct wilc_sdio *sdio_priv = wilc->bus_data;
+	u32 reg;
 
 	if (nint > MAX_NUM_INT) {
 		dev_err(&func->dev, "Too many interrupts (%d)...\n", nint);
 		return -EINVAL;
+	}
+
+/* WILC3000 only. Was removed in WILC1000 on revision 6200.
+ * Might be related to suspend/resume
+ */
+	if (is_wilc3000(wilc->chipid)) {
+		/**
+		 *      Disable power sequencer
+		 **/
+		if (wilc_sdio_read_reg(wilc, WILC_MISC, &reg)) {
+			dev_err(&func->dev, "Failed read misc reg\n");
+			return -EINVAL;
+		}
+		reg &= ~BIT(8);
+		if (wilc_sdio_write_reg(wilc, WILC_MISC, reg)) {
+			dev_err(&func->dev, "Failed write misc reg\n");
+			return -EINVAL;
+		}
 	}
 
 	if (sdio_priv->irq_gpio) {
@@ -1051,7 +1070,8 @@ static int wilc_sdio_resume(struct device *dev)
 
 static const struct of_device_id wilc_of_match[] = {
 	{ .compatible = "microchip,wilc1000", },
-	{ /* sentinel */ }
+	{ .compatible = "microchip,wilc3000", },
+	{ /* sentinel */}
 };
 MODULE_DEVICE_TABLE(of, wilc_of_match);
 
