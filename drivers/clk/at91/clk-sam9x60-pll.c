@@ -23,7 +23,7 @@
 #define UPLL_DIV		2
 #define PLL_MUL_MAX		(FIELD_GET(PMC_PLL_CTRL1_MUL_MSK, UINT_MAX) + 1)
 
-#define PLL_MAX_ID		7
+#define PLL_MAX_ID		9
 
 struct sam9x60_pll_core {
 	struct regmap *regmap;
@@ -103,12 +103,8 @@ static int sam9x60_frac_pll_set(struct sam9x60_pll_core *core)
 	    (cmul == frac->mul && cfrac == frac->frac))
 		goto unlock;
 
-	/* Recommended value for PMC_PLL_ACR */
-	if (core->characteristics->upll)
-		val = AT91_PMC_PLL_ACR_DEFAULT_UPLL;
-	else
-		val = AT91_PMC_PLL_ACR_DEFAULT_PLLA;
-	regmap_write(regmap, AT91_PMC_PLL_ACR, val);
+	/* Load recommended value for PMC_PLL_ACR */
+	regmap_write(regmap, AT91_PMC_PLL_ACR, core->characteristics->acr);
 
 	regmap_write(regmap, AT91_PMC_PLL_CTRL1,
 		     (frac->mul << core->layout->mul_shift) |
