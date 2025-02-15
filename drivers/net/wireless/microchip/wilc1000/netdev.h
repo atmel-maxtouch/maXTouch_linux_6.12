@@ -319,7 +319,6 @@ struct wilc {
 	struct ieee80211_rate bitrates[ARRAY_SIZE(wilc_bitrates)];
 	struct ieee80211_supported_band band;
 	u32 cipher_suites[ARRAY_SIZE(wilc_cipher_suites)];
-	u8 nv_mac_address[ETH_ALEN];
 };
 
 struct wilc_wfi_mon_priv {

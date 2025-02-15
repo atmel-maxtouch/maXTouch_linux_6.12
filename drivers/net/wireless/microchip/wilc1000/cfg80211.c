@@ -457,13 +457,6 @@ static int disconnect(struct wiphy *wiphy, struct net_device *dev,
 
 	if (!wilc)
 		return -EIO;
-
-	if (wilc->close) {
-		/* already disconnected done */
-		cfg80211_disconnected(dev, 0, NULL, 0, true, GFP_KERNEL);
-		return 0;
-	}
-
 	wfi_drv = (struct host_if_drv *)priv->hif_drv;
 	if (vif->iftype != WILC_CLIENT_MODE)
 		wilc->sta_ch = WILC_INVALID_CHANNEL;
@@ -1568,7 +1561,7 @@ struct wilc_vif *wilc_get_vif_from_type(struct wilc *wl, int type)
 {
 	struct wilc_vif *vif;
 
-	wilc_for_each_vif(wl, vif) {
+	list_for_each_entry_rcu(vif, &wl->vif_list, list) {
 		if (vif->iftype == type)
 			return vif;
 	}
@@ -1663,7 +1656,6 @@ static int del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 	    wdev->iftype == NL80211_IFTYPE_P2P_GO)
 		wilc_wfi_deinit_mon_interface(wl, true);
 	vif = netdev_priv(wdev->netdev);
-	cfg80211_stop_iface(wiphy, wdev, GFP_KERNEL);
 	cfg80211_unregister_netdevice(vif->ndev);
 	vif->monitor_flag = 0;
 
@@ -1672,6 +1664,16 @@ static int del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 	wl->vif_num--;
 	mutex_unlock(&wl->vif_mutex);
 	synchronize_srcu(&wl->srcu);
+	return 0;
+}
+
+static int wilc_suspend(struct wiphy *wiphy, struct cfg80211_wowlan *wow)
+{
+	return 0;
+}
+
+static int wilc_resume(struct wiphy *wiphy)
+{
 	return 0;
 }
 
@@ -1805,6 +1807,8 @@ static const struct cfg80211_ops wilc_cfg80211_ops = {
 	.set_power_mgmt = set_power_mgmt,
 	.set_cqm_rssi_config = set_cqm_rssi_config,
 
+	.suspend = wilc_suspend,
+	.resume = wilc_resume,
 	.set_wakeup = wilc_set_wakeup,
 	.set_tx_power = set_tx_power,
 	.get_tx_power = get_tx_power,
@@ -1840,7 +1844,7 @@ void wlan_deinit_locks(struct wilc *wilc)
 	cleanup_srcu_struct(&wilc->srcu);
 }
 
-static struct wilc *wilc_create_wiphy(struct device *dev)
+struct wilc *wilc_create_wiphy(struct device *dev)
 {
 	struct wiphy *wiphy;
 	struct wilc *wl;
@@ -1897,6 +1901,7 @@ int wilc_cfg80211_init(struct wilc **wilc, struct device *dev, int io_type,
 		       const struct wilc_hif_func *ops)
 {
 	struct wilc *wl;
+	struct wilc_vif *vif;
 	int ret, i;
 
 	wl = wilc_create_wiphy(dev);
@@ -1925,8 +1930,19 @@ int wilc_cfg80211_init(struct wilc **wilc, struct device *dev, int io_type,
 		ret = -ENOMEM;
 		goto free_cfg;
 	}
+	vif = wilc_netdev_ifc_init(wl, "wlan%d", WILC_STATION_MODE,
+				   NL80211_IFTYPE_STATION, false);
+	if (IS_ERR(vif)) {
+		ret = PTR_ERR(vif);
+		goto free_hq;
+	}
+
+	wilc_sysfs_init(wl);
 
 	return 0;
+
+free_hq:
+	destroy_workqueue(wl->hif_workqueue);
 
 free_cfg:
 	wilc_wlan_cfg_deinit(wl);
@@ -1946,7 +1962,6 @@ int wilc_cfg80211_register(struct wilc *wilc)
 
 	return wiphy_register(wilc->wiphy);
 }
-EXPORT_SYMBOL_GPL(wilc_cfg80211_register);
 
 int wilc_init_host_int(struct net_device *net)
 {

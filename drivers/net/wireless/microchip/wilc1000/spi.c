@@ -42,7 +42,7 @@ MODULE_PARM_DESC(enable_crc16,
 #define WILC_SPI_RSP_HDR_EXTRA_DATA	8
 
 struct wilc_spi {
-	bool isinit;		/* true if wilc_spi_init was successful */
+	bool isinit;		/* true if SPI protocol has been configured */
 	bool probing_crc;	/* true if we're probing chip's CRC config */
 	bool crc7_enabled;	/* true if crc7 is currently enabled */
 	bool crc16_enabled;	/* true if crc16 is currently enabled */
@@ -55,8 +55,6 @@ struct wilc_spi {
 static const struct wilc_hif_func wilc_hif_spi;
 
 static int wilc_spi_reset(struct wilc *wilc);
-static int wilc_spi_configure_bus_protocol(struct wilc *wilc);
-static int wilc_validate_chipid(struct wilc *wilc);
 
 /********************************************
  *
@@ -206,10 +204,9 @@ static void wilc_wlan_power(struct wilc *wilc, bool on)
 
 static int wilc_bus_probe(struct spi_device *spi)
 {
-	struct wilc_spi *spi_priv;
-	struct wilc_vif *vif;
-	struct wilc *wilc;
 	int ret;
+	struct wilc *wilc;
+	struct wilc_spi *spi_priv;
 
 	spi_priv = kzalloc(sizeof(*spi_priv), GFP_KERNEL);
 	if (!spi_priv)
@@ -235,44 +232,12 @@ static int wilc_bus_probe(struct spi_device *spi)
 	}
 	clk_prepare_enable(wilc->rtc_clk);
 
-	dev_info(&spi->dev, "Selected CRC config: crc7=%s, crc16=%s\n",
-		 enable_crc7 ? "on" : "off", enable_crc16 ? "on" : "off");
-
-	/* we need power to configure the bus protocol and to read the chip id: */
-
-	wilc_wlan_power(wilc, true);
-
-	ret = wilc_spi_configure_bus_protocol(wilc);
-	if (ret)
-		goto power_down;
-
-	ret = wilc_get_chipid(wilc);
-	if (ret)
-		goto power_down;
-
 	ret = wilc_cfg80211_register(wilc);
 	if (ret)
-		goto power_down;
+		goto netdev_cleanup;
 
-	ret = wilc_load_mac_from_nv(wilc);
-	if (ret) {
-		pr_err("Can not retrieve MAC address from chip\n");
-		goto unregister_wiphy;
-	}
-
-	wilc_wlan_power(wilc, false);
-	vif = wilc_netdev_ifc_init(wilc, "wlan%d", WILC_STATION_MODE,
-				   NL80211_IFTYPE_STATION, false);
-	if (IS_ERR(vif)) {
-		ret = PTR_ERR(vif);
-		goto unregister_wiphy;
-	}
 	return 0;
 
-unregister_wiphy:
-	wiphy_unregister(wilc->wiphy);
-power_down:
-	wilc_wlan_power(wilc, false);
 netdev_cleanup:
 	wilc_netdev_cleanup(wilc);
 	wiphy_free(wilc->wiphy);
@@ -293,6 +258,51 @@ static void wilc_bus_remove(struct spi_device *spi)
 	kfree(spi_priv);
 }
 
+static int wilc_spi_suspend(struct device *dev)
+{
+	struct spi_device *spi = to_spi_device(dev);
+	struct wilc *wilc = spi_get_drvdata(spi);
+
+	dev_info(&spi->dev, "\n\n << SUSPEND >>\n\n");
+	mutex_lock(&wilc->hif_cs);
+	chip_wakeup(wilc);
+
+	if (mutex_is_locked(&wilc->hif_cs))
+		mutex_unlock(&wilc->hif_cs);
+
+	/* notify the chip that host will sleep */
+	host_sleep_notify(wilc);
+	chip_allow_sleep(wilc);
+	mutex_lock(&wilc->hif_cs);
+
+	return 0;
+}
+
+static int wilc_spi_resume(struct device *dev)
+{
+	struct spi_device *spi = to_spi_device(dev);
+	struct wilc *wilc = spi_get_drvdata(spi);
+
+	dev_info(&spi->dev, "\n\n  <<RESUME>>\n\n");
+
+	/* wake the chip to compelete the re-initialization */
+	chip_wakeup(wilc);
+
+	if (mutex_is_locked(&wilc->hif_cs))
+		mutex_unlock(&wilc->hif_cs);
+
+	host_wakeup_notify(wilc);
+
+	mutex_lock(&wilc->hif_cs);
+
+	chip_allow_sleep(wilc);
+
+	if (mutex_is_locked(&wilc->hif_cs))
+		mutex_unlock(&wilc->hif_cs);
+
+	return 0;
+}
+
 static const struct of_device_id wilc_of_match[] = {
 	{ .compatible = "microchip,wilc1000", },
 	{ .compatible = "microchip,wilc3000", },
@@ -307,10 +317,16 @@ static const struct spi_device_id wilc_spi_id[] = {
 };
 MODULE_DEVICE_TABLE(spi, wilc_spi_id);
 
+static const struct dev_pm_ops wilc_spi_pm_ops = {
+	.suspend = wilc_spi_suspend,
+	.resume = wilc_spi_resume,
+};
+
 static struct spi_driver wilc_spi_driver = {
 	.driver = {
 		.name = SPI_MODALIAS,
 		.of_match_table = wilc_of_match,
+		.pm = &wilc_spi_pm_ops,
 	},
 	.id_table = wilc_spi_id,
 	.probe =  wilc_bus_probe,
@@ -1146,34 +1162,26 @@ static int wilc_spi_deinit(struct wilc *wilc)
 
 static int wilc_spi_init(struct wilc *wilc, bool resume)
 {
+	struct spi_device *spi = to_spi_device(wilc->dev);
 	struct wilc_spi *spi_priv = wilc->bus_data;
-	int ret;
+	u32 reg;
+	u32 chipid;
+	int ret, i;
 
 	if (spi_priv->isinit) {
 		/* Confirm we can read chipid register without error: */
-		if (wilc_validate_chipid(wilc) == 0)
+		ret = wilc_spi_read_reg(wilc, WILC_CHIPID, &chipid);
+		if (ret == 0)
 			return 0;
+
+		dev_err(&spi->dev, "Fail cmd read chip id...\n");
 	}
 
 	wilc_wlan_power(wilc, true);
 
-	ret = wilc_spi_configure_bus_protocol(wilc);
-	if (ret) {
-		wilc_wlan_power(wilc, false);
-		return ret;
-	}
-
-	spi_priv->isinit = true;
-
-	return 0;
-}
-
-static int wilc_spi_configure_bus_protocol(struct wilc *wilc)
-{
-	struct spi_device *spi = to_spi_device(wilc->dev);
-	struct wilc_spi *spi_priv = wilc->bus_data;
-	u32 reg;
-	int ret, i;
+	/*
+	 * configure protocol
+	 */
 
 	/*
 	 * Infer the CRC settings that are currently in effect.  This
@@ -1225,15 +1233,6 @@ static int wilc_spi_configure_bus_protocol(struct wilc *wilc)
 
 	spi_priv->probing_crc = false;
 
-	return 0;
-}
-
-static int wilc_validate_chipid(struct wilc *wilc)
-{
-	struct spi_device *spi = to_spi_device(wilc->dev);
-	u32 chipid;
-	int ret;
-
 	/*
 	 * make sure can read chip id without protocol error
 	 */
@@ -1242,10 +1241,19 @@ static int wilc_validate_chipid(struct wilc *wilc)
 		dev_err(&spi->dev, "Fail cmd read chip id...\n");
 		return ret;
 	}
-	if (!is_wilc1000(chipid) && !is_wilc3000(chipid)) {
-		dev_err(&spi->dev, "Unknown chip id 0x%x\n", chipid);
-		return -ENODEV;
+
+	if (!resume) {
+		chipid = wilc_get_chipid(wilc, true);
+		if (is_wilc3000(chipid)) {
+		} else if (is_wilc1000(chipid)) {
+		} else {
+			dev_err(&spi->dev, "Unsupported chipid: %x\n", chipid);
+			return -EINVAL;
+		}
+		dev_dbg(&spi->dev, "chipid %08x\n", chipid);
 	}
+
+	spi_priv->isinit = true;
 	return 0;
 }
 

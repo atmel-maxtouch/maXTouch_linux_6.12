@@ -60,6 +60,14 @@
 #define WILC_HOST_TX_CTRL_1		(WILC_PERIPH_REG_BASE + 0x88)
 #define WILC_MISC			(WILC_PERIPH_REG_BASE + 0x428)
 #define WILC_INTR_REG_BASE		(WILC_PERIPH_REG_BASE + 0xa00)
+
+#define WILC_INTERRUPT_CORTUS_0		(WILC_PERIPH_REG_BASE + 0xa8)
+#define WILC1000_CORTUS_INTERRUPT_1	(WILC_INTERRUPT_CORTUS_0 + 0x4)
+#define WILC3000_CORTUS_INTERRUPT_1	(WILC_INTERRUPT_CORTUS_0 + 0x14)
+
+#define WILC1000_CORTUS_INTERRUPT_2	(WILC_INTERRUPT_CORTUS_0 + 0x8)
+#define WILC3000_CORTUS_INTERRUPT_2	(WILC_INTERRUPT_CORTUS_0 + 0x18)
+
 #define WILC_INTR_ENABLE		WILC_INTR_REG_BASE
 #define WILC_INTR2_ENABLE		(WILC_INTR_REG_BASE + 4)
 
@@ -96,14 +104,17 @@
 #define WILC_SPI_INT_STATUS		(WILC_SPI_REG_BASE + 0x40)
 #define WILC_SPI_INT_CLEAR		(WILC_SPI_REG_BASE + 0x44)
 
-#define WILC_SPI_WAKEUP_REG		0x1
-#define WILC_SPI_WAKEUP_BIT		BIT(1)
-
 /* WILC1000 specific */
+#define WILC1000_SPI_WAKEUP_REG	0x1
+#define WILC1000_SPI_WAKEUP_BIT	BIT(1)
+
 #define WILC1000_SPI_CLK_STATUS_REG	0x0f
 #define WILC1000_SPI_CLK_STATUS_BIT	BIT(2)
 
 /* WILC3000 specific */
+#define WILC3000_SPI_WAKEUP_REG	0x1
+#define WILC3000_SPI_WAKEUP_BIT	BIT(1)
+
 #define WILC3000_SPI_CLK_STATUS_REG	0x13
 #define WILC3000_SPI_CLK_STATUS_BIT	BIT(2)
 
@@ -129,10 +140,10 @@
 #define WILC_SDIO_CCCR_ABORT_RESET	BIT(3)
 
 /* Vendor specific CCCR registers */
-#define WILC_SDIO_WAKEUP_REG		0xf0
-#define WILC_SDIO_WAKEUP_BIT		BIT(0)
-
 /* WILC1000 */
+#define WILC1000_SDIO_WAKEUP_REG	0xf0
+#define WILC1000_SDIO_WAKEUP_BIT	BIT(0)
+
 #define WILC1000_SDIO_CLK_STATUS_REG	0xf1
 #define WILC1000_SDIO_CLK_STATUS_BIT	BIT(0)
 
@@ -140,11 +151,15 @@
 #define WILC1000_SDIO_IRQ_CLEAR_FLAG_REG	0xf8
 
 /* WILC3000 specific */
-#define WILC3000_SDIO_CLK_STATUS_REG	0xf0 /* clk & wakeup are on same reg */
+#define WILC3000_SDIO_WAKEUP_REG	0xf0
+#define WILC3000_SDIO_WAKEUP_BIT	BIT(0)
+
+#define WILC3000_SDIO_CLK_STATUS_REG	0xf0 /* clk & wakeup are on same reg*/
 #define WILC3000_SDIO_CLK_STATUS_BIT	BIT(4)
 
-#define WILC3000_SDIO_VMM_TBL_CTRL_REG	0xf1
 #define WILC3000_SDIO_IRQ_FLAG_REG	0xfe
+#define WILC3000_SDIO_IRQ_CLEAR_FLAG_REG	0xfe
+#define WILC3000_SDIO_VMM_TBL_CTRL_REG	0xf1
 
 /* Common vendor specific CCCR register */
 #define WILC_SDIO_INTERRUPT_DATA_SZ_REG	0xf2 /* Read size (2 bytes) */
@@ -191,11 +206,8 @@
 #define WILC_HAVE_USE_IRQ_AS_HOST_WAKE	BIT(8)
 
 #define WILC_CORTUS_INTERRUPT_BASE	0x10A8
-#define WILC1000_CORTUS_INTERRUPT_1	(WILC_CORTUS_INTERRUPT_BASE + 0x4)
-#define WILC3000_CORTUS_INTERRUPT_1	(WILC_CORTUS_INTERRUPT_BASE + 0x14)
-
-#define WILC1000_CORTUS_INTERRUPT_2	(WILC_CORTUS_INTERRUPT_BASE + 0x8)
-#define WILC3000_CORTUS_INTERRUPT_2	(WILC_CORTUS_INTERRUPT_BASE + 0x18)
+#define WILC_CORTUS_INTERRUPT_1		(WILC_CORTUS_INTERRUPT_BASE + 0x4)
+#define WILC_CORTUS_INTERRUPT_2		(WILC_CORTUS_INTERRUPT_BASE + 0x8)
 
 /* tx control register 1 to 4 for RX */
 #define WILC_REG_4_TO_1_RX		0x1e1c
@@ -205,8 +217,6 @@
 
 #define WILC_CORTUS_RESET_MUX_SEL	0x1118
 #define WILC_CORTUS_BOOT_REGISTER	0xc0000
-#define WILC3000_BOOTROM_STATUS		0x207ac
-#define WILC3000_CORTUS_BOOT_REGISTER_2	0x4f0000
 #define WILC3000_CHIP_ID		0x3b0000
 
 #define WILC_CORTUS_BOOT_FROM_IRAM	0x71
@@ -470,12 +480,13 @@ netdev_tx_t wilc_mac_xmit(struct sk_buff *skb, struct net_device *dev);
 
 bool wilc_wfi_p2p_rx(struct wilc_vif *vif, u8 *buff, u32 size);
 bool wilc_wfi_mgmt_frame_rx(struct wilc_vif *vif, u8 *buff, u32 size);
-int host_wakeup_notify(struct wilc *wilc);
-int host_sleep_notify(struct wilc *wilc);
+void host_wakeup_notify(struct wilc *wilc);
+void host_sleep_notify(struct wilc *wilc);
+void chip_allow_sleep(struct wilc *wilc);
+void chip_wakeup(struct wilc *wilc);
 int wilc_send_config_pkt(struct wilc_vif *vif, u8 mode, struct wid *wids,
 			 u32 count);
 void eap_buff_timeout(struct timer_list *t);
 int wilc_wlan_init(struct net_device *dev);
-int wilc_get_chipid(struct wilc *wilc);
-int wilc_load_mac_from_nv(struct wilc *wilc);
+u32 wilc_get_chipid(struct wilc *wilc, bool update);
 #endif

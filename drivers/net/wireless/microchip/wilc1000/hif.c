@@ -125,7 +125,7 @@ static struct wilc_vif *wilc_get_vif_from_idx(struct wilc *wilc, int idx)
 	if (index < 0 || index >= WILC_NUM_CONCURRENT_IFC)
 		return NULL;
 
-	wilc_for_each_vif(wilc, vif) {
+	list_for_each_entry_rcu(vif, &wilc->vif_list, list) {
 		if (vif->idx == index)
 			return vif;
 	}
@@ -1374,7 +1374,7 @@ int wilc_get_mac_address(struct wilc_vif *vif, u8 *mac_addr)
 	return result;
 }
 
-int wilc_set_mac_address(struct wilc_vif *vif, const u8 *mac_addr)
+int wilc_set_mac_address(struct wilc_vif *vif, u8 *mac_addr)
 {
 	struct wid wid;
 	int result;
@@ -1382,7 +1382,7 @@ int wilc_set_mac_address(struct wilc_vif *vif, const u8 *mac_addr)
 	wid.id = WID_MAC_ADDR;
 	wid.type = WID_STR;
 	wid.size = ETH_ALEN;
-	wid.val = (u8 *)mac_addr;
+	wid.val = mac_addr;
 
 	result = wilc_send_config_pkt(vif, WILC_SET_CFG, &wid, 1);
 	if (result)
