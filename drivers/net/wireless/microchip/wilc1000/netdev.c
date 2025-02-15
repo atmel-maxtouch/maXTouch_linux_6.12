@@ -29,6 +29,22 @@
 #define __WILC3000_FW(api)		WILC3000_FW_PREFIX #api ".bin"
 #define WILC3000_FW(api)		__WILC3000_FW(api)
 
+static void wilc_disable_irq(struct wilc *wilc, int wait)
+{
+	if (wait) {
+		pr_info("%s Disabling IRQ ...\n", __func__);
+		disable_irq(wilc->dev_irq_num);
+	} else {
+		pr_info("%s Disabling IRQ ...\n", __func__);
+		disable_irq_nosync(wilc->dev_irq_num);
+	}
+}
+
+static irqreturn_t host_wakeup_isr(int irq, void *user_data)
+{
+	return IRQ_HANDLED;
+}
+
 static irqreturn_t isr_uh_routine(int irq, void *user_data)
 {
 	struct wilc *wilc = user_data;
@@ -58,18 +74,29 @@ static int init_irq(struct net_device *dev)
 {
 	struct wilc_vif *vif = netdev_priv(dev);
 	struct wilc *wl = vif->wilc;
-	int ret;
 
-	ret = request_threaded_irq(wl->dev_irq_num, isr_uh_routine,
-				   isr_bh_routine,
-				   IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-				   dev->name, wl);
-	if (ret) {
-		netdev_err(dev, "Failed to request IRQ [%d]\n", ret);
-		return ret;
+	if (wl->dev_irq_num <= 0)
+		return 0;
+
+	if (wl->io_type == WILC_HIF_SPI ||
+	    wl->io_type == WILC_HIF_SDIO_GPIO_IRQ) {
+		if (request_threaded_irq(wl->dev_irq_num, isr_uh_routine,
+					 isr_bh_routine,
+					 IRQF_TRIGGER_FALLING | IRQF_NO_SUSPEND,
+					 dev->name, wl) < 0) {
+			pr_err("Failed to request IRQ [%d]\n", wl->dev_irq_num);
+			return -EINVAL;
+		}
+	} else {
+		if (request_irq(wl->dev_irq_num, host_wakeup_isr,
+				IRQF_TRIGGER_FALLING | IRQF_NO_SUSPEND,
+				dev->name, wl) < 0) {
+			pr_err("Failed to request IRQ [%d]\n", wl->dev_irq_num);
+			return -EINVAL;
+		}
 	}
 	netdev_dbg(dev, "IRQ request succeeded IRQ-NUM= %d\n", wl->dev_irq_num);
-
+	enable_irq_wake(wl->dev_irq_num);
 	return 0;
 }
 
@@ -222,24 +249,20 @@ static int wilc_wlan_get_firmware(struct net_device *dev)
 {
 	struct wilc_vif *vif = netdev_priv(dev);
 	struct wilc *wilc = vif->wilc;
+	int chip_id;
 	const struct firmware *wilc_fw;
-	char *firmware;
 	int ret;
 
-	if (is_wilc1000(wilc->chipid))
-		firmware = WILC1000_FW(WILC1000_API_VER);
-	else if (is_wilc3000(wilc->chipid))
-		firmware = WILC3000_FW(WILC3000_API_VER);
-	else
-		return -EINVAL;
+	chip_id = wilc_get_chipid(wilc, false);
 
-	netdev_info(dev, "WILC%d loading firmware [%s]\n",
-		    is_wilc1000(wilc->chipid) ? 1000 : 3000,
-		    firmware);
+	netdev_info(dev, "ChipID [%x] loading firmware [%s]\n", chip_id,
+		    WILC1000_FW(WILC1000_API_VER));
 
-	ret = request_firmware(&wilc_fw, firmware, wilc->dev);
+	ret = request_firmware(&wilc_fw, WILC1000_FW(WILC1000_API_VER),
+			       wilc->dev);
 	if (ret != 0) {
-		netdev_err(dev, "%s - firmware not available\n", firmware);
+		netdev_err(dev, "%s - firmware not available\n",
+			   WILC1000_FW(WILC1000_API_VER));
 		return -EINVAL;
 	}
 	wilc->firmware = wilc_fw;
@@ -476,6 +499,7 @@ static void wlan_deinitialize_threads(struct net_device *dev)
 
 static void wilc_wlan_deinitialize(struct net_device *dev)
 {
+	int ret;
 	struct wilc_vif *vif = netdev_priv(dev);
 	struct wilc *wl = vif->wilc;
 
@@ -485,20 +509,27 @@ static void wilc_wlan_deinitialize(struct net_device *dev)
 	}
 
 	if (wl->initialized) {
-		netdev_info(dev, "Deinitializing wilc1000...\n");
+		netdev_info(dev, "Deinitializing WILC...\n");
 
-		if (!wl->dev_irq_num &&
-		    wl->hif_func->disable_interrupt) {
-			mutex_lock(&wl->hif_cs);
-			wl->hif_func->disable_interrupt(wl);
-			mutex_unlock(&wl->hif_cs);
+		if (wl->io_type == WILC_HIF_SPI ||
+		    wl->io_type == WILC_HIF_SDIO_GPIO_IRQ) {
+			wilc_disable_irq(wl, 1);
+		} else {
+			if (wl->hif_func->disable_interrupt) {
+				mutex_lock(&wl->hif_cs);
+				wl->hif_func->disable_interrupt(wl);
+				mutex_unlock(&wl->hif_cs);
+			}
 		}
 		complete(&wl->txq_event);
 
 		wlan_deinitialize_threads(dev);
 		deinit_irq(dev);
 
-		wilc_wlan_stop(wl, vif);
+		ret = wilc_wlan_stop(wl, vif);
+		if (ret != 0)
+			pr_err("failed in wlan_stop\n");
+
 		wilc_wlan_cleanup(dev);
 
 		wl->initialized = false;
@@ -543,13 +574,11 @@ static int wilc_wlan_initialize(struct net_device *dev, struct wilc_vif *vif)
 		if (ret)
 			goto fail_wilc_wlan;
 
-		if (wl->dev_irq_num && init_irq(dev)) {
-			ret = -EIO;
+		ret = init_irq(dev);
+		if (ret)
 			goto fail_threads;
-		}
 
-		if (!wl->dev_irq_num &&
-		    wl->hif_func->enable_interrupt &&
+		if (wl->io_type == WILC_HIF_SDIO &&
 		    wl->hif_func->enable_interrupt(wl)) {
 			ret = -EIO;
 			goto fail_irq_init;
@@ -590,12 +619,11 @@ fail_fw_start:
 		wilc_wlan_stop(wl, vif);
 
 fail_irq_enable:
-		if (!wl->dev_irq_num &&
-		    wl->hif_func->disable_interrupt)
+		if (wl->io_type == WILC_HIF_SDIO)
 			wl->hif_func->disable_interrupt(wl);
 fail_irq_init:
-		if (wl->dev_irq_num)
-			deinit_irq(dev);
+		deinit_irq(dev);
+
 fail_threads:
 		wlan_deinitialize_threads(dev);
 fail_wilc_wlan:

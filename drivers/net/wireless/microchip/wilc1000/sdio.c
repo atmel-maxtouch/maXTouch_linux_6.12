@@ -16,6 +16,14 @@
 #include "netdev.h"
 #include "cfg80211.h"
 
+enum sdio_host_lock {
+	WILC_SDIO_HOST_NO_TAKEN = 0,
+	WILC_SDIO_HOST_IRQ_TAKEN = 1,
+	WILC_SDIO_HOST_DIS_TAKEN = 2,
+};
+
+static enum sdio_host_lock	sdio_intr_lock = WILC_SDIO_HOST_NO_TAKEN;
+static wait_queue_head_t sdio_intr_waitqueue;
 #define SDIO_MODALIAS "wilc1000_sdio"
 
 static const struct sdio_device_id wilc_sdio_ids[] = {
@@ -33,6 +41,7 @@ struct wilc_sdio {
 	bool irq_gpio;
 	u32 block_size;
 	bool isinit;
+	struct wilc *wl;
 	u8 *cmd53_buf;
 };
 
@@ -60,9 +69,14 @@ static const struct wilc_hif_func wilc_hif_sdio;
 
 static void wilc_sdio_interrupt(struct sdio_func *func)
 {
+	if (sdio_intr_lock == WILC_SDIO_HOST_DIS_TAKEN)
+		return;
+	sdio_intr_lock = WILC_SDIO_HOST_IRQ_TAKEN;
 	sdio_release_host(func);
 	wilc_handle_isr(sdio_get_drvdata(func));
 	sdio_claim_host(func);
+	sdio_intr_lock = WILC_SDIO_HOST_NO_TAKEN;
+	wake_up_interruptible(&sdio_intr_waitqueue);
 }
 
 static int wilc_sdio_cmd52(struct wilc *wilc, struct sdio_cmd52 *cmd)
@@ -141,11 +155,10 @@ out:
 static int wilc_sdio_probe(struct sdio_func *func,
 			   const struct sdio_device_id *id)
 {
-	struct wilc_sdio *sdio_priv;
-	struct wilc_vif *vif;
 	struct wilc *wilc;
-	int ret;
-
+	int ret, io_type;
+	struct wilc_sdio *sdio_priv;
+	int irq_num;
 
 	sdio_priv = kzalloc(sizeof(*sdio_priv), GFP_KERNEL);
 	if (!sdio_priv)
@@ -157,30 +170,30 @@ static int wilc_sdio_probe(struct sdio_func *func,
 		goto free;
 	}
 
-	ret = wilc_cfg80211_init(&wilc, &func->dev, WILC_HIF_SDIO,
-				 &wilc_hif_sdio);
+	if (IS_ENABLED(CONFIG_WILC_HW_OOB_INTR))
+		io_type = WILC_HIF_SDIO_GPIO_IRQ;
+	else
+		io_type = WILC_HIF_SDIO;
+
+	ret = wilc_cfg80211_init(&wilc, &func->dev, io_type, &wilc_hif_sdio);
 	if (ret)
 		goto free;
-
-	if (IS_ENABLED(CONFIG_WILC1000_HW_OOB_INTR)) {
-		struct device_node *np = func->card->dev.of_node;
-		int irq_num = of_irq_get(np, 0);
-
-		if (irq_num > 0) {
-			wilc->dev_irq_num = irq_num;
-			sdio_priv->irq_gpio = true;
-		}
-	}
 
 	sdio_set_drvdata(func, wilc);
 	wilc->bus_data = sdio_priv;
 	wilc->dev = &func->dev;
 
-	wilc->rtc_clk = devm_clk_get_optional_enabled(&func->card->dev, "rtc");
+	irq_num = of_irq_get(func->card->dev.of_node, 0);
+	if (irq_num > 0)
+		wilc->dev_irq_num = irq_num;
+
+	wilc->rtc_clk = devm_clk_get_optional(&func->card->dev, "rtc");
 	if (IS_ERR(wilc->rtc_clk)) {
 		ret = PTR_ERR(wilc->rtc_clk);
 		goto dispose_irq;
 	}
+	clk_prepare_enable(wilc->rtc_clk);
+
 
 	wilc_sdio_init(wilc, false);
 
@@ -227,6 +240,7 @@ static void wilc_sdio_remove(struct sdio_func *func)
 	struct wilc *wilc = sdio_get_drvdata(func);
 	struct wilc_sdio *sdio_priv = wilc->bus_data;
 
+	clk_disable_unprepare(wilc->rtc_clk);
 	wilc_netdev_cleanup(wilc);
 	wiphy_unregister(wilc->wiphy);
 	wiphy_free(wilc->wiphy);
@@ -265,6 +279,8 @@ static int wilc_sdio_enable_interrupt(struct wilc *dev)
 	struct sdio_func *func = container_of(dev->dev, struct sdio_func, dev);
 	int ret = 0;
 
+	sdio_intr_lock  = WILC_SDIO_HOST_NO_TAKEN;
+
 	sdio_claim_host(func);
 	ret = sdio_claim_irq(func, wilc_sdio_interrupt);
 	sdio_release_host(func);
@@ -281,11 +297,19 @@ static void wilc_sdio_disable_interrupt(struct wilc *dev)
 	struct sdio_func *func = container_of(dev->dev, struct sdio_func, dev);
 	int ret;
 
+	dev_info(&func->dev, "%s\n", __func__);
+
+	if (sdio_intr_lock  == WILC_SDIO_HOST_IRQ_TAKEN)
+		wait_event_interruptible(sdio_intr_waitqueue,
+					 sdio_intr_lock == WILC_SDIO_HOST_NO_TAKEN);
+	sdio_intr_lock  = WILC_SDIO_HOST_DIS_TAKEN;
+
 	sdio_claim_host(func);
 	ret = sdio_release_irq(func);
 	if (ret < 0)
 		dev_err(&func->dev, "can't release sdio_irq, err(%d)\n", ret);
 	sdio_release_host(func);
+	sdio_intr_lock  = WILC_SDIO_HOST_NO_TAKEN;
 }
 
 /********************************************
@@ -683,6 +707,7 @@ static int wilc_sdio_init(struct wilc *wilc, bool resume)
 	struct wilc_sdio *sdio_priv = wilc->bus_data;
 	struct sdio_cmd52 cmd;
 	int loop, ret;
+	u32 chipid;
 
 	/* Patch for sdio interrupt latency issue */
 	ret = pm_runtime_get_sync(mmc_dev(func->card->host));
@@ -690,6 +715,9 @@ static int wilc_sdio_init(struct wilc *wilc, bool resume)
 		pm_runtime_put_noidle(mmc_dev(func->card->host));
 		return ret;
 	}
+
+	init_waitqueue_head(&sdio_intr_waitqueue);
+	sdio_priv->irq_gpio = (wilc->io_type == WILC_HIF_SDIO_GPIO_IRQ);
 
 	/**
 	 *      function 0 csa enable
