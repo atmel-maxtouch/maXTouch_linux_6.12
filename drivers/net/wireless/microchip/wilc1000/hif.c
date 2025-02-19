@@ -6,6 +6,7 @@
 
 #include "cfg80211.h"
 #include "netdev.h"
+#include "cfg80211.h"
 
 #define WILC_HIF_SCAN_TIMEOUT_MS                5000
 #define WILC_HIF_CONNECT_TIMEOUT_MS             9500
@@ -2496,19 +2497,19 @@ int wilc_get_tx_power(struct wilc_vif *vif, u8 *tx_power)
 
 int wilc_set_default_mgmt_key_index(struct wilc_vif *vif, u8 index)
 {
-        struct wid wid;
-        int result;
+	struct wid wid;
+	int result;
 
-        wid.id = WID_DEFAULT_MGMT_KEY_ID;
-        wid.type = WID_CHAR;
-        wid.size = sizeof(char);
-        wid.val = &index;
-        result = wilc_send_config_pkt(vif, WILC_SET_CFG, &wid, 1);
-        if (result)
-                netdev_err(vif->ndev,
-                           "Failed to send default mgmt key index\n");
+	wid.id = WID_DEFAULT_MGMT_KEY_ID;
+	wid.type = WID_CHAR;
+	wid.size = sizeof(char);
+	wid.val = &index;
+	result = wilc_send_config_pkt(vif, WILC_SET_CFG, &wid, 1);
+	if (result)
+		netdev_err(vif->ndev,
+			   "Failed to send default mgmt key index\n");
 
-        return result;
+	return result;
 }
 
 static bool is_valid_gpio(struct wilc_vif *vif, u8 gpio)
@@ -2579,14 +2580,61 @@ int wilc_set_antenna(struct wilc_vif *vif, u8 mode)
 	return ret;
 }
 
-void wilc_set_fw_debug_level(struct wilc *wl, u8 dbg_level)
+void wilc_set_fw_debug_level(struct wilc *wl)
 {
 	struct wilc_vif *vif = wilc_get_wl_to_vif(wl);
 	struct wid wid;
+	struct wilc_fw_debug_level val;
 
-	wid.id = WID_FW_PRINT_LEVEL;
-	wid.type = WID_CHAR;
-	wid.size = sizeof(char);
-	wid.val = &dbg_level;
+	val.level = wl->attr_sysfs.fw_dbg_level;
+	val.mod_filter = cpu_to_le32(wl->attr_sysfs.fw_dbg_mod_filter);
+
+	wid.id = WID_DEBUG_MODULE_LEVEL;
+	wid.type = WID_STR;
+	wid.size = sizeof(val);
+	wid.val = (u8 *)&val;
 	wilc_send_config_pkt(vif, WILC_SET_CFG, &wid, 1);
+}
+
+int wilc_init_coex_config(struct wilc_vif *vif)
+{
+	struct sysfs_attr_group *attr_sysfs_p = &vif->wilc->attr_sysfs;
+
+	if ((attr_sysfs_p->coex_inteface_type & ~(BIT(0))) != 0)
+		goto fail;
+	if ((attr_sysfs_p->coex_wlan_bt_priority & ~(BIT(0) | BIT(1))) != 0)
+		goto fail;
+	if ((attr_sysfs_p->coex_antenna_mode & ~(BIT(0))) != 0)
+		goto fail;
+	if ((attr_sysfs_p->coex_enabled & ~(BIT(0))) != 0)
+		goto fail;
+
+	if (!wilc_wlan_cfg_set(vif, 0, WID_COEX_INTERFACE_TYPE,
+			       &attr_sysfs_p->coex_inteface_type, 1, 0, 0))
+		goto fail;
+	if (!wilc_wlan_cfg_set(vif, 0, WID_COEX_PRIORITY_FLAGS,
+			       &attr_sysfs_p->coex_wlan_bt_priority, 1, 0, 0))
+		goto fail;
+	if (!wilc_wlan_cfg_set(vif, 0, WID_COEX_ANTENNA_MODE,
+			       &attr_sysfs_p->coex_antenna_mode, 1, 0, 0))
+		goto fail;
+	if (!wilc_wlan_cfg_set(vif, 0, WID_COEX_ENABLE,
+			       &attr_sysfs_p->coex_enabled, 1, 1, 0))
+		goto fail;
+
+	return 0;
+fail:
+	return -EINVAL;
+}
+
+int wilc_set_coex_param(struct wilc *wilc, int wid, u8 b)
+{
+	struct wilc_vif *vif = wilc_get_wl_to_vif(wilc);
+
+	if (!wilc_wlan_cfg_set(vif, 0, wid, &b, 1, 1, 0)) {
+		PRINT_ER(vif->ndev, "Failed to set coex param\n");
+		return -EINVAL;
+	}
+
+	return 0;
 }

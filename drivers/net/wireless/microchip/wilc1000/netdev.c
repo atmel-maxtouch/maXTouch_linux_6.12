@@ -16,6 +16,8 @@
 #define WILC_MULTICAST_TABLE_SIZE	8
 #define WILC_MAX_FW_VERSION_STR_SIZE	50
 
+#define MAX_COUNTRY_CODE_LEN 40
+
 /* latest API version supported */
 #define WILC1000_API_VER		1
 
@@ -39,6 +41,10 @@
 static int wilc_mac_open(struct net_device *ndev);
 static int wilc_mac_close(struct net_device *ndev);
 
+u8 reg_dom[MAX_COUNTRY_CODE_LEN] = {0};
+u8 reg_dom_set[RD_COUNTRY_CODE_LEN + 4] = {RD_COUNTRY_CODE_LEN, 0};
+char reg_dom_buffer[MAX_COUNTRY_CODE_LEN] = {0};
+static char *reg_domain_param;
 
 #ifdef WILC_S02_TEST_BUS_INTERFACE
 static int frame_size = WILC_S02_TEST_FRAME_SIZE;	/* configure the frame size of loopback */
@@ -480,6 +486,7 @@ static int wilc_init_fw_config(struct net_device *dev, struct wilc_vif *vif)
 	u8 b;
 	u16 hw;
 	u32 w;
+	struct wilc_fw_debug_level dbg_level;
 
 	netdev_dbg(dev, "Start configuring Firmware\n");
 	hif_drv = (struct host_if_drv *)priv->hif_drv;
@@ -633,10 +640,17 @@ static int wilc_init_fw_config(struct net_device *dev, struct wilc_vif *vif)
 	if (!wilc_wlan_cfg_set(vif, 0, WID_11N_CURRENT_TX_MCS, &b, 1, 0, 0))
 		goto fail;
 
-	b = vif->wilc->attr_sysfs.fw_dbg_level;
-	if (!wilc_wlan_cfg_set(vif, 0, WID_FW_PRINT_LEVEL, &b, 1, 0, 0))
-		goto fail;
+	if (is_wilcs02(vif->wilc->chipid)) {
+		dbg_level.level = vif->wilc->attr_sysfs.fw_dbg_level;
+		dbg_level.mod_filter = cpu_to_le32(vif->wilc->attr_sysfs.fw_dbg_mod_filter);
+		if (!wilc_wlan_cfg_set(vif, 0, WID_DEBUG_MODULE_LEVEL,
+				       (u8 *)&dbg_level, 1, 0, 0))
+			goto fail;
 
+		b = WILC_AMPDU_RX_EN_TX_DIS;
+		if (!wilc_wlan_cfg_set(vif, 0, WID_AMPDU_ENABLE, &b, 1, 0, 0))
+			goto fail;
+	}
 	b = 1;
 	if (!wilc_wlan_cfg_set(vif, 0, WID_11N_IMMEDIATE_BA_ENABLED, &b, 1,
 			       1, 0))
@@ -788,6 +802,43 @@ int wilc_s02_check_firmware_download(struct wilc *wl)
 	return ret;
 }
 
+static void host_get_reg_info(struct wilc_vif *vif, u8 *reg_info)
+{
+	int result;
+	struct wid wid;
+
+	wid.id = WID_REG_DOMAIN_INFO;
+	wid.type = WID_STR;
+	wid.val = reg_info;
+	wid.size = 256;
+
+	result = wilc_send_config_pkt(vif, WILC_GET_CFG, &wid, 1);
+	if (result) {
+		*reg_info = 0;
+		netdev_err(vif->ndev, "Failed to get %s\n", __func__);
+		return;
+	}
+}
+
+void host_set_reg_info(struct wilc_vif *vif,
+					u8 *reg_info)
+{
+	int result;
+	struct wid wid;
+
+	wid.id = WID_REG_DOMAIN_INFO;
+	wid.type = WID_STR;
+	wid.val = reg_info;
+	wid.size = RD_COUNTRY_CODE_LEN + 4;
+
+	result = wilc_send_config_pkt(vif, WILC_SET_CFG, &wid, 1);
+	if (result) {
+		*reg_info = 0;
+		netdev_err(vif->ndev, "Failed to set %s\n", __func__);
+		return;
+	}
+}
+
 static int wilc_wlan_initialize(struct net_device *dev, struct wilc_vif *vif)
 {
 	int ret = 0;
@@ -856,6 +907,40 @@ static int wilc_wlan_initialize(struct net_device *dev, struct wilc_vif *vif)
 				netdev_err(dev, "Failed to configure firmware\n");
 				ret = -EIO;
 				goto fail_fw_start;
+			}
+
+			if (is_wilcs02(wl->chipid)) {
+				host_get_reg_info(vif, reg_dom);
+
+				if (reg_dom[1] != 0) {
+					reg_dom[0] = '"';
+					reg_dom[MAX_COUNTRY_CODE_LEN - 1] = '"';
+					strcpy(reg_dom_buffer, reg_dom);
+					ptr = strstr(reg_dom, "**");
+					r_active = (char *)strsep(&ptr, ",");
+					for (int i = 0; i < MAX_COUNTRY_CODE_LEN; i++) {
+						if (reg_dom_buffer[i] == ',')
+							reg_dom_buffer[i] = ' ';
+					}
+					PRINT_INFO(dev, INIT_DBG, "country code byffer from firmware %s\n", &reg_dom_buffer[1]);
+					PRINT_INFO(dev, INIT_DBG, "Currently active country code = %s\n", (char *)&r_active[2]);
+					if (reg_domain_param) {
+						int len = strlen(reg_domain_param);
+
+						PRINT_INFO(dev, INIT_DBG, "\n reg_domain_param %s length %d setting the reg domain\n", reg_domain_param, len);
+						strncpy((char *)(&reg_dom_set[2]), reg_domain_param, len);
+						host_set_reg_info(vif, reg_dom_set);
+					}
+				} else {
+					PRINT_INFO(dev, INIT_DBG, "continue with default GEN domain\n");
+				}
+
+				ret = wilc_init_coex_config(vif);
+				if (ret < 0) {
+					netdev_err(dev, "Failed to conigure coex params\n");
+					ret = -EIO;
+					goto fail_fw_start;
+				}
 			}
 		}
 		wl->initialized = true;
