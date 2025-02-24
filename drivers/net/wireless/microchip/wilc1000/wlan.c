@@ -1509,6 +1509,13 @@ int wilc_wlan_firmware_download(struct wilc *wilc, const u8 *buffer,
 
 				if ((reg >> 1) & 0x2) {
 					pr_err("The best firmware already installed on WILCS02");
+					ret = wilc_s02_reset_firmware(wilc,
+						      WILC_S02_SOFT_RESET | (WILC_S02_WLAN_RESET << 8));
+					if (ret < 0) {
+						pr_err("Failed to start firmware\n");
+						ret = -EIO;
+						goto fail;
+					}
 					release_bus(wilc,
 						    WILC_BUS_RELEASE_ALLOW_SLEEP,
 						    DEV_WIFI);

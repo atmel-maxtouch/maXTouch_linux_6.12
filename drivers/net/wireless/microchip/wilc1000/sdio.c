@@ -262,13 +262,6 @@ static int wilc_sdio_probe(struct sdio_func *func,
 	}
 
 	if (is_wilcs02(wilc->chipid)) {
-		ret = wilc_s02_reset_firmware(wilc,
-					      WILC_S02_SOFT_RESET | (WILC_S02_WLAN_RESET << 8));
-		if (ret < 0) {
-			pr_err("Failed to start firmware\n");
-			ret = -EIO;
-			goto disable_rtc_clk;
-		}
 		ret = wilc_s02_check_firmware_download(wilc);
 		if (ret)
 			goto disable_rtc_clk;
@@ -381,7 +374,7 @@ static int wilc_sdio_enable_interrupt(struct wilc *dev)
 
 	sdio_intr_lock  = WILC_SDIO_HOST_NO_TAKEN;
 
-	if(is_wilcs02(dev->chipid))
+	if (is_wilcs02(dev->chipid))
 		dev->hif_func->hif_clear_int_ext(dev, DATA_INT_CLR | ENABLE_RX_VMM);
 
 	sdio_claim_host(func);
