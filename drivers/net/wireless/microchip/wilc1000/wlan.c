@@ -290,12 +290,13 @@ static int wilc_wlan_txq_add_cfg_pkt(struct wilc_vif *vif, u8 *buffer,
 		return 0;
 #endif
 
-	PRINT_INFO(vif->ndev, TX_DBG, "Adding config packet ...\n");
-	if (wilc->quit) {
-		netdev_dbg(vif->ndev, "Return due to clear function\n");
+	if (wilc->quit || !wilc->initialized) {
+		netdev_dbg(vif->ndev, "don't add cfg packet to TxQ\n");
 		complete(&wilc->cfg_event);
 		return 0;
 	}
+
+	PRINT_INFO(vif->ndev, TX_DBG, "Adding config packet ...\n");
 
 	tqe = kmalloc(sizeof(*tqe), GFP_ATOMIC);
 	if (!tqe) {
