@@ -175,6 +175,7 @@ static const struct clk_pll_characteristics upll_characteristics = {
 	.num_output = ARRAY_SIZE(upll_outputs),
 	.output = upll_outputs,
 	.core_output = upll_core_outputs,
+	.acr = UL(0x12020010),
 	.upll = true,
 };
 
