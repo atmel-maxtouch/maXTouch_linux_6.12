@@ -647,7 +647,7 @@
 };
 
 &usb0 {
-	atmel,vbus-gpio = <&pioA PIN_PC8 GPIO_ACTIVE_HIGH>;
+	atmel,vbus-gpio = <&pioa PIN_PC8 GPIO_ACTIVE_HIGH>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_usba_vbus_det>;
 	status = "okay";
@@ -660,8 +660,8 @@
 &ohci0 {
 	num-ports = <3>;
 	atmel,vbus-gpio = <0
-			   &pioA PIN_PC20 GPIO_ACTIVE_HIGH
-			   &pioA PIN_PC21 GPIO_ACTIVE_HIGH>;
+			   &pioa PIN_PC20 GPIO_ACTIVE_HIGH
+			   &pioa PIN_PC21 GPIO_ACTIVE_HIGH>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_usbb_vbus_en &pinctrl_usbc_vbus_en>;
 	status = "okay";
