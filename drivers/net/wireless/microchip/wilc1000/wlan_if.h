@@ -8,6 +8,7 @@
 #define WILC_WLAN_IF_H
 
 #include <linux/netdevice.h>
+#include "debugfs.h"
 #include "fw.h"
 
 #define WILC_MAX_ASSOC_RESP_FRAME_SIZE 512
@@ -17,6 +18,7 @@
  *      Wlan Configuration ID
  *
  ********************************************/
+#define	FW_WILC3000_BLE		"mchp/wilc3000_ble_firmware.bin"
 
 enum bss_types {
 	WILC_FW_BSS_TYPE_INFRA = 0,
@@ -36,6 +38,10 @@ enum {
 	WILC_FW_PREAMBLE_LONG = 1,	/* Long Preamble */
 	WILC_FW_PREAMBLE_AUTO = 2,	/* Auto Preamble Selection */
 };
+
+#define DEV_WIFI	0
+#define DEV_BT		1
+#define DEV_MAX		2
 
 enum {
 	WILC_FW_PASSIVE_SCAN = 0,
@@ -191,6 +197,44 @@ enum {
 	WILC_FW_AUTH_REQ_IDX = 2
 };
 
+enum {
+	WILC_FW_PRINT_LVL_ERROR   = 1,
+	WILC_FW_PRINT_LVL_DEBUG   = 2,
+	WILC_FW_PRINT_LVL_INFO    = 3,
+	WILC_FW_PRINT_LVL_FUN_PT  = 4,
+	WILC_FW_PRINT_LVL_MAX,
+};
+
+enum {
+	WILC_FW_DBG_MOD_STA_TX_DATA   = BIT(0),
+	WILC_FW_DBG_MOD_STA_RX_DATA   = BIT(1),
+	WILC_FW_DBG_MOD_AP_TX_DATA   = BIT(2),
+	WILC_FW_DBG_MOD_AP_RX_DATA   = BIT(3),
+	WILC_FW_DBG_MOD_SCAN   = BIT(4),
+	WILC_FW_DBG_MOD_WID_GET   = BIT(5),
+	WILC_FW_DBG_MOD_WID_SET   = BIT(6),
+	WILC_FW_DBG_MOD_EVENT_HOST_RX   = BIT(7),
+	WILC_FW_DBG_MOD_EVENT_WLAN_RX   = BIT(8),
+	WILC_FW_DBG_MOD_EVENT_MISC   = BIT(9),
+	WILC_FW_DBG_MOD_STA_INIT   = BIT(10),
+	WILC_FW_DBG_MOD_AP_INIT   = BIT(11),
+	WILC_FW_DBG_MOD_AP_MGMT   = BIT(12),
+	WILC_FW_DBG_MOD_STA_MGMT   = BIT(13),
+	WILC_FW_DBG_MOD_WIFI_SEC   = BIT(14),
+	WILC_FW_DBG_MOD_MEM   = BIT(15),
+	WILC_FW_DBG_MOD_DHCP   = BIT(16),
+	WILC_FW_DBG_MOD_DHCPS   = BIT(17),
+	WILC_FW_DBG_MOD_PHY   = BIT(18),
+	WILC_FW_DBG_MOD_P2P   = BIT(19),
+	WILC_FW_DBG_MOD_PS   = BIT(20),
+	WILC_FW_DBG_MOD_BRINGUP   = BIT(21),
+	WILC_FW_DBG_MOD_TPC   = BIT(22),
+	WILC_FW_DBG_MOD_LC   = BIT(23),
+	WILC_FW_DBG_MOD_HW_UT   = BIT(31)
+};
+
+#define DEFAULT_FW_DBG_MOD_LEVEL	0
+
 enum wid_type {
 	WID_CHAR		= 0,
 	WID_SHORT		= 1,
@@ -198,6 +242,13 @@ enum wid_type {
 	WID_STR			= 3,
 	WID_BIN_DATA		= 4,
 	WID_BIN			= 5,
+};
+
+enum {
+	ANTENNA1		= 0,
+	ANTENNA2		= 1,
+	DIVERSITY		= 2,
+	NUM_ANT_MODE
 };
 
 struct wid {
@@ -670,8 +721,18 @@ enum {
 	WID_TX_POWER			= 0x00CE,
 	WID_WOWLAN_TRIGGER		= 0X00CF,
 	WID_SET_MFP                     = 0x00D0,
+	WID_USE_PRIORITY_EAPOL		= 0x00D1,
 
 	WID_DEFAULT_MGMT_KEY_ID		= 0x00D2,
+	/* Coexistence arbiter */
+	WID_COEX_INTERFACE_TYPE		= 0x00E0,
+	WID_COEX_PRIORITY_FLAGS		= 0x00E1,
+	WID_COEX_ANTENNA_MODE		= 0x00E2,
+	WID_COEX_T1			= 0x00E3,
+	WID_COEX_T5			= 0x00E4,
+	WID_COEX_T7			= 0x00E5,
+	WID_COEX_ENABLE			= 0x00E6,
+	WID_AMPDU_ENABLE		= 0x00E7,
 	/*  EMAC Short WID list */
 	/*  RTS Threshold */
 	/*
@@ -741,6 +802,7 @@ enum {
 	WID_OPERATIONAL_RATE_SET	= 0x3002,
 	WID_BSSID			= 0x3003,
 	WID_WEP_KEY_VALUE		= 0x3004,
+	WID_REG_DOMAIN_INFO		= 0x3007,
 	WID_11I_PSK			= 0x3008,
 	WID_11E_P_ACTION_REQ		= 0x3009,
 	WID_1X_KEY			= 0x300A,
@@ -766,6 +828,7 @@ enum {
 	WID_MODEL_NAME			= 0x3027, /* Added for CAPI tool */
 	WID_MODEL_NUM			= 0x3028, /* Added for CAPI tool */
 	WID_DEVICE_NAME			= 0x3029, /* Added for CAPI tool */
+	WID_DEBUG_MODULE_LEVEL  = 0x3033,
 
 	/* NMAC String WID list */
 	WID_SET_OPERATION_MODE		= 0x3079,
@@ -805,7 +868,9 @@ enum {
 	WID_ADD_BEACON			= 0x408a,
 
 	WID_SETUP_MULTICAST_FILTER	= 0x408b,
+	WID_ANTENNA_SELECTION		= 0x408c,
 	WID_EXTERNAL_AUTH_PARAM		= 0x408d,
+
 	/* Miscellaneous WIDs */
 	WID_ALL				= 0x7FFE,
 	WID_MAX				= 0xFFFF
