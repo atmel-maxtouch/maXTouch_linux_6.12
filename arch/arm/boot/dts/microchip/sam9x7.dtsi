@@ -68,6 +68,63 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 
+		usb0: gadget@500000 {
+			compatible = "microchip,sam9x60-udc";
+			reg = <0x500000 0x100000>,
+			      <0xf803c000 0x400>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			interrupts = <23 IRQ_TYPE_LEVEL_HIGH 2>;
+			clocks = <&pmc PMC_TYPE_PERIPHERAL 23>, <&pmc PMC_TYPE_CORE PMC_UTMI>;
+			clock-names = "pclk", "hclk";
+			assigned-clocks = <&pmc PMC_TYPE_CORE PMC_UTMI>;
+			assigned-clock-rates = <480000000>;
+			status = "disabled";
+		};
+
+		ohci0: usb@600000 {
+			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+			reg = <0x600000 0x100000>;
+			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+			clocks = <&pmc PMC_TYPE_PERIPHERAL 22>, <&pmc PMC_TYPE_PERIPHERAL 22>, <&pmc PMC_TYPE_SYSTEM 6>;
+			clock-names = "ohci_clk", "hclk", "uhpck";
+			status = "disabled";
+		};
+
+		ehci0: usb@700000 {
+			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+			reg = <0x700000 0x100000>;
+			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+			clocks = <&pmc PMC_TYPE_CORE PMC_UTMI>, <&pmc PMC_TYPE_PERIPHERAL 22>;
+			clock-names = "usb_clk", "ehci_clk";
+			assigned-clocks = <&pmc PMC_TYPE_CORE PMC_UTMI>;
+			assigned-clock-rates = <480000000>;
+			status = "disabled";
+		};
+
+		ebi: ebi@10000000 {
+			compatible = "microchip,sam9x60-ebi";
+			#address-cells = <2>;
+			#size-cells = <1>;
+			atmel,smc = <&smc>;
+			microchip,sfr = <&sfr>;
+			reg = <0x10000000 0x60000000>;
+			ranges = <0x0 0x0 0x10000000 0x10000000
+				  0x1 0x0 0x20000000 0x10000000
+				  0x2 0x0 0x30000000 0x10000000>;
+			clocks = <&pmc PMC_TYPE_CORE PMC_MCK>;
+			status = "disabled";
+
+			nand_controller: nand-controller {
+				compatible = "microchip,sam9x60-nand-controller";
+				ecc-engine = <&pmecc>;
+				#address-cells = <2>;
+				#size-cells = <1>;
+				ranges;
+				status = "disabled";
+			};
+		};
+
 		sdmmc0: mmc@80000000 {
 			compatible = "microchip,sam9x7-sdhci", "microchip,sam9x60-sdhci";
 			reg = <0x80000000 0x300>;
@@ -266,6 +323,38 @@
 				(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
 				 AT91_XDMAC_DT_PERID(39))>;
 			dma-names = "tx", "rx";
+			status = "disabled";
+		};
+
+		qspi: spi@f0014000 {
+			compatible = "microchip,sam9x7-ospi";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0xf0014000 0x100>, <0x60000000 0x20000000>;
+			reg-names = "qspi_base", "qspi_mmap";
+			interrupts = <35 IRQ_TYPE_LEVEL_HIGH 7>;
+			dmas = <&dma0
+				(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+				 AT91_XDMAC_DT_PERID(26))>,
+			       <&dma0
+				(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+				 AT91_XDMAC_DT_PERID(27))>;
+			dma-names = "tx", "rx";
+			clocks = <&pmc PMC_TYPE_PERIPHERAL 35>, <&pmc PMC_TYPE_GCK 35>;
+			clock-names = "pclk", "gclk";
+			assigned-clocks = <&pmc PMC_TYPE_GCK 35>;
+			assigned-clock-parents = <&pmc PMC_TYPE_CORE PMC_PLLADIV2>;
+			status = "disabled";
+		};
+
+		gpu: gfx2d@f0018000 {
+			compatible = "microchip,sam9x60-gfx2d";
+			reg = <0xf0018000 0x4000>;
+			interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
+			clocks = <&pmc PMC_TYPE_PERIPHERAL 36>;
+			clock-names = "periph_clk";
+			#address-cells = <1>;
+			#size-cells = <0>;
 			status = "disabled";
 		};
 
@@ -983,6 +1072,34 @@
 			status = "disabled";
 		};
 
+		/*
+		 * LCDC Clock related properties will be defined in the DT overlay file
+		 * considering LCDC Generic Clock is disabled with LVDS Display.
+		 */
+		hlcdc: hlcdc@f8038000 {
+			compatible = "microchip,sam9x75-xlcdc";
+			reg = <0xf8038000 0x4000>;
+			interrupts = <25 IRQ_TYPE_LEVEL_HIGH 0>;
+			status = "disabled";
+
+			hlcdc-display-controller {
+				compatible = "atmel,hlcdc-display-controller";
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					reg = <0>;
+				};
+			};
+
+			hlcdc_pwm: hlcdc-pwm {
+				compatible = "atmel,hlcdc-pwm";
+				#pwm-cells = <3>;
+			};
+		};
+
 		flx9: flexcom@f8040000 {
 			compatible = "microchip,sam9x7-flexcom", "atmel,sama5d2-flexcom";
 			reg = <0xf8040000 0x200>;
@@ -1087,14 +1204,141 @@
 			};
 		};
 
+		xisc: xisc@f8048000 {
+			compatible = "microchip,sama7g5-isc";
+			reg = <0xf8048000 0x2000>;
+			interrupts = <43 IRQ_TYPE_LEVEL_HIGH 7>;
+			clocks = <&pmc PMC_TYPE_PERIPHERAL 43>;
+			clock-names = "hclock";
+			#clock-cells = <0>;
+			clock-output-names = "isc-mck";
+			status = "disabled";
+
+			port {
+				xisc_in: endpoint {
+					bus-width = <14>;
+					hsync-active = <1>;
+					vsync-active = <1>;
+					remote-endpoint = <&csi2dc_out>;
+				};
+			};
+		};
+
+		adc: adc@f804c000 {
+			compatible = "microchip,sam9x7-adc", "atmel,sama5d2-adc";
+			reg = <0xf804c000 0x100>;
+			interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
+			clocks = <&pmc PMC_TYPE_PERIPHERAL 19>;
+			clock-names = "adc_clk";
+			dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) | AT91_XDMAC_DT_PERID(40))>;
+			dma-names = "rx";
+			atmel,min-sample-rate-hz = <200000>;
+			atmel,max-sample-rate-hz = <20000000>;
+			atmel,startup-time-ms = <4>;
+			atmel,trigger-edge-type = <IRQ_TYPE_EDGE_RISING>;
+			#io-channel-cells = <1>;
+			status = "disabled";
+		};
+
+		sfr: sfr@f8050000 {
+			compatible = "microchip,sam9x60-sfr", "syscon";
+			reg = <0xf8050000 0x400>;
+		};
+
+		dsi: dsi@f8054000 {
+			compatible = "microchip,sam9x75-mipi-dsi";
+			reg = <0xf8054000 0x200>;
+			clocks = <&pmc PMC_TYPE_PERIPHERAL 54>, <&pmc PMC_TYPE_GCK 55>;
+			clock-names = "pclk", "refclk";
+			microchip,sfr = <&sfr>;
+			status = "disabled";
+		};
+
+		csi2host: csi2host@f8058000 {
+			compatible = "snps,dw-csi";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0xf8058000 0x7FF>;
+			interrupts = <53 IRQ_TYPE_LEVEL_HIGH 7>;
+			clocks = <&pmc PMC_TYPE_PERIPHERAL 53>, <&pmc PMC_TYPE_GCK 55>;
+			clock-names = "perclk", "phyclk";
+			assigned-clocks = <&pmc PMC_TYPE_GCK 55>;
+			assigned-clock-rates = <26600000>;
+			snps,output-type = <1>;
+			phys = <&csi_dphy>;
+			status = "disabled";
+
+			port@1 {
+				reg = <1>;
+				csi2host_in: endpoint {
+				};
+			};
+
+			port@2 {
+				reg = <2>;
+				csi2host_out: endpoint {
+				};
+			};
+		};
+
+		csi_dphy: dphy@f8058040 {
+			compatible = "snps,dw-dphy-rx";
+			#phy-cells = <0>;
+			bus-width = <8>;
+			snps,dphy-frequency = <900000>;
+			snps,phy_type = <0>;
+			reg = <0xf8058040 0x20>;
+			status = "disabled";
+		};
+
+		csi2dc: csi2dc@f805c000 {
+			compatible = "microchip,sama7g5-csi2dc";
+			reg = <0xf805c000 0x500>;
+			clocks = <&pmc PMC_TYPE_PERIPHERAL 52>, <&xisc>;
+			clock-names = "pclk", "scck";
+			assigned-clocks = <&xisc>;
+			assigned-clock-rates = <266000000>;
+			status = "disabled";
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				port@0 {
+					reg = <0>;
+					csi2dc_in: endpoint {
+					};
+				};
+
+				port@1 {
+					reg = <1>;
+					csi2dc_out: endpoint {
+						bus-width = <14>;
+						hsync-active = <1>;
+						vsync-active = <1>;
+						remote-endpoint = <&xisc_in>;
+					};
+				};
+			};
+		};
+
+		lvds_controller: lvds-controller@f8060000 {
+			compatible = "microchip,sam9x7-lvds";
+			reg = <0xf8060000 0x100>;
+			interrupts = <56 IRQ_TYPE_LEVEL_HIGH 0>;
+			clocks = <&pmc PMC_TYPE_PERIPHERAL 56>;
+			clock-names = "pclk";
+			status = "disabled";
+		};
+
 		matrix: matrix@ffffde00 {
 			compatible = "microchip,sam9x7-matrix", "atmel,at91sam9x5-matrix", "syscon";
 			reg = <0xffffde00 0x200>;
 		};
 
 		pmecc: ecc-engine@ffffe000 {
-			compatible = "microchip,sam9x7-pmecc", "atmel,at91sam9g45-pmecc";
+			compatible = "microchip,sam9x7-pmecc";
 			reg = <0xffffe000 0x300>, <0xffffe600 0x100>;
+			clocks = <&pmc PMC_TYPE_PERIPHERAL 48>;
 		};
 
 		mpddrc: mpddrc@ffffe800 {
