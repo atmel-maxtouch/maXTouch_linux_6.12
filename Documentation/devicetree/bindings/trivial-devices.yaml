@@ -263,6 +263,8 @@ properties:
           - microchip,tc654
             # PWM Fan Speed Controller With Fan Fault Detection
           - microchip,tc655
+            # Microchip Thread Radio Co-Processor(RCP) Device
+          - microchip,thrc3001
             # Micron SPI NOR Authenta
           - micron,spi-authenta
             # MiraMEMS DA226 2-axis 14-bit digital accelerometer
