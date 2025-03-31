@@ -7670,6 +7670,14 @@ F:	drivers/phy/mediatek/phy-mtk-dp.c
 F:	drivers/phy/mediatek/phy-mtk-hdmi*
 F:	drivers/phy/mediatek/phy-mtk-mipi*
 
+DRM DRIVERS FOR MICROCHIP
+M:	Cyrille Pitchen <cyrille.pitchen@microchip.com>
+L:	dri-devel@lists.freedesktop.org
+S:	Supported
+F:	Documentation/devicetree/bindings/gpu/microchip,gfx2d.yaml
+F:	drivers/gpu/drm/microchip/
+F:	include/uapi/drm/microchip_drm.h
+
 DRM DRIVERS FOR NVIDIA TEGRA
 M:	Thierry Reding <thierry.reding@gmail.com>
 M:	Mikko Perttunen <mperttunen@nvidia.com>
