@@ -521,7 +521,7 @@ static int atmel_ptc_request_pins(struct atmel_ptc *ptc)
 			if (ptc->x_lines_requested[j])
 				continue;
 
-			if (gpio_request_one(ptc->pins->x_lines[j].id, GPIOF_DIR_IN, ptc->pins->x_lines[j].name)) {
+			if (gpio_request_one(ptc->pins->x_lines[j].id, GPIOF_IN, ptc->pins->x_lines[j].name)) {
 				dev_err(ptc->dev, "Can't get %s\n", ptc->pins->x_lines[j].name);
 				return -ENXIO;
 			}
@@ -532,7 +532,7 @@ static int atmel_ptc_request_pins(struct atmel_ptc *ptc)
 			if (ptc->y_lines_requested[j])
 				continue;
 
-			if (gpio_request_one(ptc->pins->y_lines[j].id, GPIOF_DIR_IN, ptc->pins->y_lines[j].name)) {
+			if (gpio_request_one(ptc->pins->y_lines[j].id, GPIOF_IN, ptc->pins->y_lines[j].name)) {
 				dev_err(ptc->dev, "Can't get %s\n", ptc->pins->y_lines[j].name);
 				return -ENXIO;
 			}
@@ -1070,7 +1070,7 @@ static int atmel_ptc_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int atmel_ptc_remove(struct platform_device *pdev)
+static void atmel_ptc_remove(struct platform_device *pdev)
 {
 	struct atmel_ptc *ptc = platform_get_drvdata(pdev);
 
@@ -1080,8 +1080,6 @@ static int atmel_ptc_remove(struct platform_device *pdev)
 
 	if (debug_mode)
 		sysfs_remove_group(&ptc->dev->kobj, &atmel_ptc_qtm_mb_attr_group);
-
-	return 0;
 }
 
 /*
