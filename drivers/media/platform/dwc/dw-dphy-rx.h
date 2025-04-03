@@ -180,7 +180,10 @@ int dw_dphy_power_on(struct phy *phy);
 u8 dw_dphy_setup_config(struct dw_dphy_rx *dphy);
 void dw_dphy_write(struct dw_dphy_rx *dphy, u32 address, u32 data);
 u32 dw_dphy_read(struct dw_dphy_rx *dphy, u32 address);
+void dw_dphy_write_msk(struct dw_dphy_rx *dev, u32 address, u32 data, u8 shift,
+		       u8 width);
 int dw_dphy_te_read(struct dw_dphy_rx *dphy, u32 addr);
+int dw_dphy_g118_settle(struct dw_dphy_rx *dphy);
 
 #if IS_ENABLED(CONFIG_DWC_MIPI_TC_DPHY_GEN3)
 u32 dw_dphy_if_read(struct dw_dphy_rx *dphy, u32 address);
@@ -197,7 +200,7 @@ u32 dw_dphy_if_read_msk(struct dw_dphy_rx *dphy,
 #endif /*IS_ENABLED(CONFIG_DWC_MIPI_TC_DPHY_GEN3)*/
 
 static inline struct phy *dw_dphy_xlate(struct device *dev,
-					struct of_phandle_args *args)
+					const struct of_phandle_args *args)
 {
 	struct dw_dphy_rx *dphy = dev_get_drvdata(dev);
 
