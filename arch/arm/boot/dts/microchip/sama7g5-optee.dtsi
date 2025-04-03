@@ -220,6 +220,18 @@
 	/delete-property/assigned-clock-rates;
 };
 
+&xisc {
+	clocks = <&scmi0_clock AT91_SCMI_CLK_PERIPH_ISC_CLK>;
+};
+
+&pdmc0 {
+	clocks = <&scmi0_clock AT91_SCMI_CLK_PERIPH_PDMC0_CLK>, <&scmi0_clock AT91_SCMI_CLK_GCK_PDMC0_GCLK>;
+};
+
+&pdmc1 {
+	clocks = <&scmi0_clock AT91_SCMI_CLK_PERIPH_PDMC1_CLK>, <&scmi0_clock AT91_SCMI_CLK_GCK_PDMC1_GCLK>;
+};
+
 &asrc {
 	clocks = <&scmi0_clock AT91_SCMI_CLK_PERIPH_ASRC_CLK>, <&scmi0_clock AT91_SCMI_CLK_GCK_ASRC_GCLK>;
 	/delete-property/assigned-clocks;
@@ -377,6 +389,14 @@
 
 &spdiftx {
 	clocks = <&scmi0_clock AT91_SCMI_CLK_PERIPH_SPDIFTX_CLK>, <&scmi0_clock AT91_SCMI_CLK_GCK_SPDIFTX_GCLK>;
+};
+
+&i2s0 {
+	clocks = <&scmi0_clock AT91_SCMI_CLK_PERIPH_I2S0_CLK>, <&scmi0_clock AT91_SCMI_CLK_GCK_I2S0_GCLK>;
+};
+
+&i2s1 {
+	clocks = <&scmi0_clock AT91_SCMI_CLK_PERIPH_I2S1_CLK>, <&scmi0_clock AT91_SCMI_CLK_GCK_I2S1_GCLK>;
 };
 
 &utmi_clk {
