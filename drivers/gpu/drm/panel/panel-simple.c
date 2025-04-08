@@ -4565,7 +4565,7 @@ static const struct panel_desc yes_optoelectronics_ytc700tlag_05_201c = {
 	.connector_type = DRM_MODE_CONNECTOR_LVDS,
 };
 
-static const struct drm_display_mode sitronix_st7262_lvds_mode = {
+static const struct drm_display_mode mchp_ac69t88a_mode = {
 	.clock = 25000,
 	.hdisplay = 800,
 	.hsync_start = 800 + 88,
@@ -4577,8 +4577,8 @@ static const struct drm_display_mode sitronix_st7262_lvds_mode = {
 	.vtotal = 480 + 23 + 5 + 1,
 };
 
-static const struct panel_desc sitronix_st7262_lvds = {
-	.modes = &sitronix_st7262_lvds_mode,
+static const struct panel_desc mchp_ac69t88a = {
+	.modes = &mchp_ac69t88a_mode,
 	.num_modes = 1,
 	.bpc = 8,
 	.size = {
@@ -5074,8 +5074,8 @@ static const struct of_device_id platform_of_match[] = {
 		.compatible = "yes-optoelectronics,ytc700tlag-05-201c",
 		.data = &yes_optoelectronics_ytc700tlag_05_201c,
 	}, {
-		.compatible = "sitronix,st7262",
-		.data = &sitronix_st7262_lvds,
+		.compatible = "microchip,ac69t88a",
+		.data = &mchp_ac69t88a,
 	}, {
 		/* Must be the last entry */
 		.compatible = "panel-dpi",

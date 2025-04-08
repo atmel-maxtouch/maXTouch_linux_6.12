@@ -331,12 +331,6 @@ static const struct at91_adc_reg_layout sama7g5_layout = {
 #define AT91_HWFIFO_MAX_SIZE_STR	"128"
 #define AT91_HWFIFO_MAX_SIZE		128
 
-#define AT91_SAMA5D2_CHAN_SINGLE(index, num, addr)			\
-	AT91_SAMA_CHAN_SINGLE(index, num, addr, 14)
-
-#define AT91_SAMA7G5_CHAN_SINGLE(index, num, addr)			\
-	AT91_SAMA_CHAN_SINGLE(index, num, addr, 16)
-
 #define AT91_SAMA_CHAN_SINGLE(index, num, addr, rbits)			\
 	{								\
 		.type = IIO_VOLTAGE,					\
@@ -358,11 +352,11 @@ static const struct at91_adc_reg_layout sama7g5_layout = {
 		.indexed = 1,						\
 	}
 
-#define AT91_SAMA5D2_CHAN_DIFF(index, num, num2, addr)			\
-	AT91_SAMA_CHAN_DIFF(index, num, num2, addr, 14)
+#define AT91_SAMA5D2_CHAN_SINGLE(index, num, addr)			\
+	AT91_SAMA_CHAN_SINGLE(index, num, addr, 14)
 
-#define AT91_SAMA7G5_CHAN_DIFF(index, num, num2, addr)			\
-	AT91_SAMA_CHAN_DIFF(index, num, num2, addr, 16)
+#define AT91_SAMA7G5_CHAN_SINGLE(index, num, addr)			\
+	AT91_SAMA_CHAN_SINGLE(index, num, addr, 16)
 
 #define AT91_SAMA_CHAN_DIFF(index, num, num2, addr, rbits)		\
 	{								\
@@ -386,6 +380,12 @@ static const struct at91_adc_reg_layout sama7g5_layout = {
 		.datasheet_name = "CH"#num"-CH"#num2,			\
 		.indexed = 1,						\
 	}
+
+#define AT91_SAMA5D2_CHAN_DIFF(index, num, num2, addr)			\
+	AT91_SAMA_CHAN_DIFF(index, num, num2, addr, 14)
+
+#define AT91_SAMA7G5_CHAN_DIFF(index, num, num2, addr)			\
+	AT91_SAMA_CHAN_DIFF(index, num, num2, addr, 16)
 
 #define AT91_SAMA5D2_CHAN_TOUCH(num, name, mod)				\
 	{								\

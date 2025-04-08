@@ -620,9 +620,9 @@ static int atmel_qspi_wait_for_completion(struct atmel_qspi *aq, u32 irq_mask)
 static int atmel_qspi_transfer(struct spi_mem *mem,
 			       const struct spi_mem_op *op, u32 offset)
 {
-	struct atmel_qspi *aq =
-		spi_controller_get_devdata(mem->spi->controller);
+	struct atmel_qspi *aq = spi_controller_get_devdata(mem->spi->controller);
 
+	/* Skip to the final steps if there is no data */
 	if (!op->data.nbytes)
 		return atmel_qspi_wait_for_completion(aq,
 						      QSPI_SR_CMD_COMPLETED);
@@ -631,12 +631,19 @@ static int atmel_qspi_transfer(struct spi_mem *mem,
 	(void)atmel_qspi_read(aq, QSPI_IFR);
 
 	/* Send/Receive data */
-	if (op->data.dir == SPI_MEM_DATA_IN)
+	if (op->data.dir == SPI_MEM_DATA_IN) {
 		memcpy_fromio(op->data.buf.in, aq->mem + offset,
 			      op->data.nbytes);
-	else
+
+		/* Synchronize AHB and APB accesses again */
+		rmb();
+	} else {
 		memcpy_toio(aq->mem + offset, op->data.buf.out,
 			    op->data.nbytes);
+
+		/* Synchronize AHB and APB accesses again */
+		wmb();
+	}
 
 	/* Release the chip-select */
 	atmel_qspi_write(QSPI_CR_LASTXFER, aq, QSPI_CR);
@@ -1371,6 +1378,11 @@ static int atmel_qspi_probe(struct platform_device *pdev)
 	ctrl->num_chipselect = 1;
 	ctrl->dev.of_node = pdev->dev.of_node;
 	platform_set_drvdata(pdev, ctrl);
+
+	aq = spi_controller_get_devdata(ctrl);
+
+	init_completion(&aq->cmd_completion);
+	aq->pdev = pdev;
 
 	/* Map the registers */
 	aq->regs = devm_platform_ioremap_resource_byname(pdev, "qspi_base");

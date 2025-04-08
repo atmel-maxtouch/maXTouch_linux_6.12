@@ -15,6 +15,7 @@
 #include <linux/io.h>
 #include <linux/init.h>
 #include <linux/list.h>
+#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
@@ -27,7 +28,7 @@
 
 static struct platform_driver syscon_driver;
 
-static DEFINE_SPINLOCK(syscon_list_slock);
+static DEFINE_MUTEX(syscon_list_lock);
 static LIST_HEAD(syscon_list);
 
 struct syscon {
@@ -45,9 +46,7 @@ static const struct regmap_config syscon_regmap_config = {
 
 static void syscon_add(struct syscon *syscon)
 {
-	spin_lock(&syscon_list_slock);
 	list_add_tail(&syscon->list, &syscon_list);
-	spin_unlock(&syscon_list_slock);
 }
 
 static struct syscon *of_syscon_register_mmio(struct device_node *np,
@@ -61,6 +60,8 @@ static struct syscon *of_syscon_register_mmio(struct device_node *np,
 	struct regmap_config syscon_config = syscon_regmap_config;
 	struct resource res;
 	struct reset_control *reset;
+
+	WARN_ON(!mutex_is_locked(&syscon_list_lock));
 
 	struct syscon *syscon __free(kfree) = kzalloc(sizeof(*syscon), GFP_KERNEL);
 	if (!syscon)
@@ -212,15 +213,13 @@ static struct regmap *device_node_get_regmap(struct device_node *np,
 {
 	struct syscon *entry, *syscon = NULL;
 
-	spin_lock(&syscon_list_slock);
+	mutex_lock(&syscon_list_lock);
 
 	list_for_each_entry(entry, &syscon_list, list)
 		if (entry->np == np) {
 			syscon = entry;
 			break;
 		}
-
-	spin_unlock(&syscon_list_slock);
 
 	if (!syscon) {
 		if (use_smccc)
@@ -235,6 +234,8 @@ static struct regmap *device_node_get_regmap(struct device_node *np,
 		if (!IS_ERR(syscon))
 			syscon_add(syscon);
 	}
+
+	mutex_unlock(&syscon_list_lock);
 
 	if (IS_ERR(syscon))
 		return ERR_CAST(syscon);
@@ -266,7 +267,7 @@ int of_syscon_register_regmap(struct device_node *np, struct regmap *regmap)
 		return -ENOMEM;
 
 	/* check if syscon entry already exists */
-	spin_lock(&syscon_list_slock);
+	mutex_lock(&syscon_list_lock);
 
 	list_for_each_entry(entry, &syscon_list, list)
 		if (entry->np == np) {
@@ -279,12 +280,12 @@ int of_syscon_register_regmap(struct device_node *np, struct regmap *regmap)
 
 	/* register the regmap in syscon list */
 	list_add_tail(&syscon->list, &syscon_list);
-	spin_unlock(&syscon_list_slock);
+	mutex_unlock(&syscon_list_lock);
 
 	return 0;
 
 err_unlock:
-	spin_unlock(&syscon_list_slock);
+	mutex_unlock(&syscon_list_lock);
 	kfree(syscon);
 	return ret;
 }
