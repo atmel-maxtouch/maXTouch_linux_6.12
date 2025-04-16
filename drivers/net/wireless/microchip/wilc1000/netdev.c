@@ -101,6 +101,10 @@ static int debug_thread(void *arg)
 		pr_info("%s <Recover>\n", __func__);
 		cfg_packet_timeout = 0;
 		timeout = 10;
+
+		if (wl->close == 1)
+			continue;
+
 		recovery_on = 1;
 		wait_for_recovery = 1;
 
