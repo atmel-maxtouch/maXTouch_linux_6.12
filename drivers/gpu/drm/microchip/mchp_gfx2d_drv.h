@@ -23,6 +23,10 @@ struct mchp_gfx2d_gem_object;
 #define MCHP_GFX2D_MAX_RECTANGLES       32
 #define MCHP_GFX2D_MAX_SURFACES         3
 
+struct mchp_gfx2d_caps {
+	bool has_dreg;
+};
+
 struct mchp_gfx2d_ring_buffer {
 	uint32_t *data;
 	u32 head;
@@ -66,6 +70,8 @@ struct mchp_gfx2d_device {
 	 * operations.
 	 */
 	struct mchp_gfx2d_gem_object *surfaces[MCHP_GFX2D_MAX_SURFACES];
+
+	const struct mchp_gfx2d_caps *caps;
 };
 
 #define drm_to_dev(dev) container_of(dev, struct mchp_gfx2d_device, drm)

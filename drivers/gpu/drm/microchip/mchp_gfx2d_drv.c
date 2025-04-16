@@ -165,6 +165,13 @@ static int mchp_gfx2d_probe(struct platform_device *pdev)
 	}
 	platform_set_drvdata(pdev, priv);
 
+	priv->caps = of_device_get_match_data(&pdev->dev);
+	if (!priv->caps) {
+		dev_err(&pdev->dev, "could not retrieve GFX2D caps\n");
+		ret = -EINVAL;
+		goto err_exit;
+	}
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	priv->regs = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(priv->regs)) {
@@ -307,9 +314,24 @@ static const struct dev_pm_ops __maybe_unused mchp_gfx2d_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
 };
 
+static const struct mchp_gfx2d_caps mchp_sam9x60_gfx2d_caps = {
+	.has_dreg = false,
+};
+
+static const struct mchp_gfx2d_caps mchp_sam9x75_gfx2d_caps = {
+	.has_dreg = true,
+};
+
 static const struct of_device_id mchp_gfx2d_of_match[] = {
-	{ .compatible = "microchip,sam9x60-gfx2d" },
-	{ },
+	{
+		.compatible = "microchip,sam9x60-gfx2d",
+		.data = &mchp_sam9x60_gfx2d_caps,
+	},
+	{
+		.compatible = "microchip,sam9x7-gfx2d",
+		.data = &mchp_sam9x75_gfx2d_caps,
+	},
+	{ /* sentinel */ },
 };
 
 static struct platform_driver mchp_gfx2d_platform_driver = {
