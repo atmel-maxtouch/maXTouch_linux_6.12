@@ -11,7 +11,9 @@ maintainers:
 
 properties:
   compatible:
-    const: microchip,sam9x60-gfx2d
+    enum:
+      - microchip,sam9x60-gfx2d
+      - microchip,sam9x7-gfx2d
 
   reg:
     maxItems: 1

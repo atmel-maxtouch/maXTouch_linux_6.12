@@ -442,7 +442,13 @@ static void mchp_gfx2d_blend(struct mchp_gfx2d_device *priv,
 			     const struct mchp_gfx2d_command *cmd,
 			     const struct mchp_gfx2d_rectangle *r)
 {
-	uint32_t word5;
+	uint32_t word0, word5;
+
+	word0 = GFX2D_WD0_OPCODE(GFX2D_OPCODE_BLEND) |
+		GFX2D_WD0_REG(BLEND_SREG) |
+		GFX2D_WD0_ARGS(4);
+	if (priv->caps->has_dreg)
+		word0 |= GFX2D_WD0_DREG(BLEND_DREG);
 
 	word5 = GFX2D_WD5_DPRE(FIELD_GET(GFX2D_BLEND_DPRE, cmd->blend.flags)) |
 		GFX2D_WD5_DAFACT(cmd->blend.dafact) |
@@ -452,10 +458,7 @@ static void mchp_gfx2d_blend(struct mchp_gfx2d_device *priv,
 		GFX2D_WD5_SCFACT(cmd->blend.scfact) |
 		GFX2D_WD5_FUNC(cmd->blend.func);
 
-	mchp_gfx2d_push(priv, GFX2D_WD0_OPCODE(GFX2D_OPCODE_BLEND) |
-			GFX2D_WD0_DREG(BLEND_DREG) |
-			GFX2D_WD0_REG(BLEND_SREG) |
-			GFX2D_WD0_ARGS(4));
+	mchp_gfx2d_push(priv, word0);
 	mchp_gfx2d_push(priv, GFX2D_WD1_SIZE(r));
 	mchp_gfx2d_push(priv, GFX2D_WD2_DPOS(r));
 	mchp_gfx2d_push(priv, GFX2D_WD3_S0POS(r));
