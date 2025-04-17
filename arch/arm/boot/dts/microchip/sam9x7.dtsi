@@ -348,7 +348,7 @@
 		};
 
 		gpu: gfx2d@f0018000 {
-			compatible = "microchip,sam9x60-gfx2d";
+			compatible = "microchip,sam9x7-gfx2d";
 			reg = <0xf0018000 0x4000>;
 			interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
 			clocks = <&pmc PMC_TYPE_PERIPHERAL 36>;
