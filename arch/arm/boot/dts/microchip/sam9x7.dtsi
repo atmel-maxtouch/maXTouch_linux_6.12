@@ -1322,7 +1322,7 @@
 		};
 
 		lvds_controller: lvds-controller@f8060000 {
-			compatible = "microchip,sam9x7-lvds";
+			compatible = "microchip,sam9x75-lvds";
 			reg = <0xf8060000 0x100>;
 			interrupts = <56 IRQ_TYPE_LEVEL_HIGH 0>;
 			clocks = <&pmc PMC_TYPE_PERIPHERAL 56>;
