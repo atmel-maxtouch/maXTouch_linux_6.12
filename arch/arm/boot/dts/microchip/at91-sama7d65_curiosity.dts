@@ -315,15 +315,20 @@
 	};
 
 	eeprom0: eeprom0@51 {
-		compatible = "atmel,24mac02e4";
+		compatible = "microchip,24aa025e48";
 		#address-cells = <1>;
 		#size-cells = <0>;
 		reg = <0x51>;
 		pagesize = <16>;
 		size = <256>;
 
-		eeprom0_eui48: eui48@fa {
-			reg = <0xfa 0x6>;
+		nvmem-layout {
+			compatible = "fixed-layout";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			eeprom0_eui48: eui48@fa {
+				reg = <0xfa 0x6>;
+			};
 		};
 	};
 };
