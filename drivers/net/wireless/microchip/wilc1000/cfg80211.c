@@ -419,7 +419,8 @@ static int connect(struct wiphy *wiphy, struct net_device *dev,
 		PRINT_INFO(vif->ndev, CORECONFIG_DBG,
 			   ">> sme->crypto.wpa_versions: %x\n",
 			   sme->crypto.wpa_versions);
-		if (sme->crypto.wpa_versions & NL80211_WPA_VERSION_2) {
+		if (sme->crypto.wpa_versions & NL80211_WPA_VERSION_2 ||
+		    sme->crypto.wpa_versions & NL80211_WPA_VERSION_3) {
 			if (cipher_group == WLAN_CIPHER_SUITE_TKIP)
 				security = WILC_FW_SEC_WPA2_TKIP;
 			else
