@@ -419,7 +419,8 @@ static int connect(struct wiphy *wiphy, struct net_device *dev,
 		PRINT_INFO(vif->ndev, CORECONFIG_DBG,
 			   ">> sme->crypto.wpa_versions: %x\n",
 			   sme->crypto.wpa_versions);
-		if (sme->crypto.wpa_versions & NL80211_WPA_VERSION_2) {
+		if (sme->crypto.wpa_versions & NL80211_WPA_VERSION_2 ||
+		    sme->crypto.wpa_versions & NL80211_WPA_VERSION_3) {
 			if (cipher_group == WLAN_CIPHER_SUITE_TKIP)
 				security = WILC_FW_SEC_WPA2_TKIP;
 			else
@@ -2215,7 +2216,6 @@ int wilc_cfg80211_init(struct wilc **wilc, struct device *dev, int io_type,
 {
 	int i, ret;
 	struct wilc *wl;
-	struct wilc_vif *vif;
 
 	wl = wilc_create_wiphy(dev);
 	if (!wl)
@@ -2245,19 +2245,10 @@ int wilc_cfg80211_init(struct wilc **wilc, struct device *dev, int io_type,
 		ret = -ENOMEM;
 		goto free_cfg;
 	}
-	vif = wilc_netdev_ifc_init(wl, "wlan%d", WILC_STATION_MODE,
-				   NL80211_IFTYPE_STATION, false);
-	if (IS_ERR(vif)) {
-		ret = PTR_ERR(vif);
-		goto free_hq;
-	}
 
 	wilc_sysfs_init(wl);
 
 	return 0;
-
-free_hq:
-	destroy_workqueue(wl->hif_workqueue);
 
 free_cfg:
 #ifdef WILC_DEBUGFS

@@ -101,6 +101,10 @@ static int debug_thread(void *arg)
 		pr_info("%s <Recover>\n", __func__);
 		cfg_packet_timeout = 0;
 		timeout = 10;
+
+		if (wl->close == 1)
+			continue;
+
 		recovery_on = 1;
 		wait_for_recovery = 1;
 
@@ -1473,10 +1477,6 @@ struct wilc_vif *wilc_netdev_ifc_init(struct wilc *wl, const char *name,
 	return vif;
 
 error:
-	if (rtnl_locked)
-		cfg80211_unregister_netdevice(ndev);
-	else
-		unregister_netdev(ndev);
 	free_netdev(ndev);
 	return ERR_PTR(ret);
 }
