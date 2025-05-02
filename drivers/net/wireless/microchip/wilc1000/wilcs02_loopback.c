@@ -40,15 +40,15 @@ void wilc_test_bus_interface(struct wilc_vif *vif, u32 frame_size,
 
 	test_frame_size = ALIGN((frame_size + ETH_ETHERNET_HDR_OFFSET), 4) & 0xFFFF;
 
-	pr_info("TEST::STARTED ->%s %d %d", __func__, test_frame_size,
-		frame_size);
+	pr_debug("TEST::STARTED ->%s %d %d", __func__, test_frame_size,
+		 frame_size);
 
 	wilc = vif->wilc;
 	ret = wilc->hif_func->hif_write_reg(wilc,
 					    wilc->vmm_ctl.host_vmm_tx_ctl,
 					    0x6 | (test_frame_size << 8));
 	if (ret) {
-		pr_err("fail write reg host_vmm_ctl..");
+		pr_err("%s tx cntrl failed", __func__);
 		return;
 	}
 	for (i = 0; i < frame_size; i++)
@@ -134,8 +134,8 @@ static void wilc_check_result(struct wilc *wilc, u8 *buffer, int size,
 			if (buffer[offset + i] != test_frame[0][i])
 				break;
 		if (i == frame_size) {
-			pr_info("Packet-%d Received correctly",
-				tested_frame_count + 1);
+			pr_debug("Packet-%d Received correctly",
+				 tested_frame_count + 1);
 			tested_frame_count++;
 		} else {
 			pr_err("Packet-%d Failed at offset = %d",
@@ -147,11 +147,11 @@ static void wilc_check_result(struct wilc *wilc, u8 *buffer, int size,
 		offset += ALIGN((frame_size + ETH_ETHERNET_HDR_OFFSET), 4);
 	}
 
-	pr_info("TEST: Total RECEIVED frames: %d received size = %d %d",
-		tested_frame_count, size, test_run_cnt);
+	pr_debug("TEST: Total RECEIVED frames: %d received size = %d %d",
+		 tested_frame_count, size, test_run_cnt);
 
 	if (tested_frame_count == WILC_S02_TEST_FRAME_COUNT - 1)
-		pr_info("TEST: COMPLETED::Success");
+		pr_debug("TEST: COMPLETED::Success");
 }
 
 void wilc_test_verify_result(struct wilc *wilc, u8 *buffer, int size)
@@ -160,15 +160,15 @@ void wilc_test_verify_result(struct wilc *wilc, u8 *buffer, int size)
 	struct wilc_vif *vif = wilc_get_wl_to_vif(wilc);
 
 	if (size > (WILC_S02_TEST_2BLOCK_FRAME_SIZE + ETH_ETHERNET_HDR_OFFSET) + 8) {
-		pr_info("BULK LOOPBACK TEST:\n Test Packet Sent to host: size=:%d %d %d",
-			WILC_S02_TEST_FRAME_SIZE, size, ETH_CONFIG_PKT_HDR_OFFSET);
+		pr_debug("BULK LOOPBACK TEST:\n Test Packet Sent to host: size=:%d %d %d",
+			 WILC_S02_TEST_FRAME_SIZE, size, ETH_CONFIG_PKT_HDR_OFFSET);
 		wilc_check_result(wilc, buffer, size, WILC_S02_TEST_FRAME_SIZE);
 
 		//Test2 - block transfer loopback
 		wilc_test_bus_interface(vif, WILC_S02_TEST_2BLOCK_FRAME_SIZE, 1);
 	} else if (size == ALIGN((WILC_S02_TEST_2BLOCK_FRAME_SIZE + ETH_ETHERNET_HDR_OFFSET), 4)) {
-		pr_info("2-BLOCK LOOPBACK TEST:\n Test Packet Sent to host: size= :%d",
-			WILC_S02_TEST_2BLOCK_FRAME_SIZE);
+		pr_debug("2-BLOCK LOOPBACK TEST:\n Test Packet Sent to host: size= :%d",
+			 WILC_S02_TEST_2BLOCK_FRAME_SIZE);
 		wilc_check_result(wilc, buffer, size,
 				  WILC_S02_TEST_2BLOCK_FRAME_SIZE);
 
@@ -176,23 +176,23 @@ void wilc_test_verify_result(struct wilc *wilc, u8 *buffer, int size)
 		wilc_test_bus_interface(vif, WILC_S02_TEST_1BLOCK_FRAME_SIZE, 1);
 
 	} else if (size == ALIGN((WILC_S02_TEST_1BLOCK_FRAME_SIZE + ETH_ETHERNET_HDR_OFFSET), 4)) {
-		pr_info("1-BLOCK LOOPBACK TEST:\n Test Packet Sent to host: size= :%d",
-			WILC_S02_TEST_1BLOCK_FRAME_SIZE);
+		pr_debug("1-BLOCK LOOPBACK TEST:\n Test Packet Sent to host: size= :%d",
+			 WILC_S02_TEST_1BLOCK_FRAME_SIZE);
 		wilc_check_result(wilc, buffer, size,
 				  WILC_S02_TEST_1BLOCK_FRAME_SIZE);
 
 		//Test2 - block transfer loopback
 		wilc_test_bus_interface(vif, WILC_S02_TEST_BYTE_FRAME_SIZE, 1);
 	} else if (size == ALIGN((WILC_S02_TEST_BYTE_FRAME_SIZE + ETH_ETHERNET_HDR_OFFSET), 4)) {
-		pr_info("BYTE LOOPBACK TEST:\n Test Packet Sent to host: size= :%d",
-			WILC_S02_TEST_BYTE_FRAME_SIZE);
+		pr_debug("BYTE LOOPBACK TEST:\n Test Packet Sent to host: size= :%d",
+			 WILC_S02_TEST_BYTE_FRAME_SIZE);
 		wilc_check_result(wilc, buffer, size, WILC_S02_TEST_BYTE_FRAME_SIZE);
 	} else {
 		/* stop the bus interface test */
 		ret = wilc->hif_func->hif_write_reg(wilc,
 						    wilc->vmm_ctl.host_vmm_tx_ctl, 0x6);
 		if (ret)
-			pr_err("fail write reg host_vmm_ctl..");
+			pr_err("%s failed", __func__);
 	}
 }
 #endif

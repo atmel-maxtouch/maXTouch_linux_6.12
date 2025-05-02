@@ -1944,7 +1944,8 @@ void wilc_gnrl_async_info_received(struct wilc *wilc, u8 *buffer, u32 length)
 	}
 
 	if (!hif_drv->conn_info.conn_result) {
-		pr_err("there is no current Connect Request\n");
+		PRINT_WRN(vif->ndev, HOSTINF_DBG,
+			  "there is no current Connect Request\n");
 		goto out;
 	}
 
