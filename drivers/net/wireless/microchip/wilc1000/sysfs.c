@@ -193,7 +193,7 @@ void wilc_sysfs_init(struct wilc *wilc)
 	wl->attr_sysfs.ant_swtch_mode = ANT_SWTCH_INVALID_GPIO_CTRL;
 	wl->attr_sysfs.antenna1 = 0xFF;
 	wl->attr_sysfs.antenna2 = 0xFF;
-	wl->attr_sysfs.fw_dbg_level = WILC_FW_PRINT_LVL_INFO;
+	wl->attr_sysfs.fw_dbg_level = WILC_FW_PRINT_LVL_ERROR;
 	wl->attr_sysfs.fw_dbg_mod_filter = DEFAULT_FW_DBG_MOD_LEVEL;
 	/* BT wifi coex params */
 	wl->attr_sysfs.coex_enabled = WLAN_BT_COEX_DISABLED;

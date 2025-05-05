@@ -211,7 +211,8 @@ static int wilc_sdio_probe(struct sdio_func *func,
 			goto free;
 		} else {
 			wilc->dev_irq_num = gpiod_to_irq(gpio_interrupt);
-			pr_info("got gpio_irq successfully %d\r\n", wilc->dev_irq_num);
+			dev_dbg(&func->dev, "got gpio_irq successfully %d\r\n",
+				wilc->dev_irq_num);
 			if (wilc->dev_irq_num < 0) {
 				dev_warn(wilc->dev, "could not the IRQ %d\n", wilc->dev_irq_num);
 				gpiod_put(gpio_interrupt);
@@ -404,7 +405,7 @@ static void wilc_sdio_disable_interrupt(struct wilc *dev)
 	struct sdio_func *func = container_of(dev->dev, struct sdio_func, dev);
 	int ret;
 
-	dev_info(&func->dev, "%s\n", __func__);
+	dev_dbg(&func->dev, "%s\n", __func__);
 
 	if (sdio_intr_lock  == WILC_SDIO_HOST_IRQ_TAKEN)
 		wait_event_interruptible(sdio_intr_waitqueue,
@@ -911,7 +912,7 @@ static int wilc_sdio_init(struct wilc *wilc, bool resume)
 #ifdef WILC_S02_TEST_BUS_INTERFACE
 	test_mode = is_test_mode;
 #endif
-	dev_info(&func->dev, "SDIO single driver speed: %d %s\n",
+	dev_info(&func->dev, "SDIO driver speed: %d %s\n",
 		 func->card->host->ios.clock, test_mode ? "loopback mode" : "");
 
 	if (!sdio_priv->is_mmc_spi) {

@@ -86,14 +86,10 @@ static int debug_thread(void *arg)
 		if (ret > 0) {
 			while (!kthread_should_stop())
 				schedule();
-			pr_info("Exit debug thread\n");
 			return 0;
 		}
 		if (!debug_running || ret == -ERESTARTSYS)
 			continue;
-
-		pr_debug("%s *** Debug Thread Running ***cnt[%d]\n", __func__,
-			 cfg_packet_timeout);
 
 		if (cfg_packet_timeout < 5)
 			continue;
@@ -176,10 +172,10 @@ static int debug_thread(void *arg)
 static void wilc_disable_irq(struct wilc *wilc, int wait)
 {
 	if (wait) {
-		pr_info("%s Disabling IRQ ...\n", __func__);
+		pr_debug("%s Disabling IRQ ...\n", __func__);
 		disable_irq(wilc->dev_irq_num);
 	} else {
-		pr_info("%s Disabling IRQ ...\n", __func__);
+		pr_debug("%s Disabling IRQ ...\n", __func__);
 		disable_irq_nosync(wilc->dev_irq_num);
 	}
 }
@@ -194,7 +190,7 @@ static irqreturn_t isr_uh_routine(int irq, void *user_data)
 	struct wilc *wilc = user_data;
 
 	if (wilc->close) {
-		pr_err("Can't handle UH interrupt\n");
+		pr_debug("Can't handle UH interrupt\n");
 		return IRQ_HANDLED;
 	}
 	return IRQ_WAKE_THREAD;
@@ -205,7 +201,7 @@ static irqreturn_t isr_bh_routine(int irq, void *userdata)
 	struct wilc *wilc = userdata;
 
 	if (wilc->close) {
-		pr_err("Can't handle BH interrupt\n");
+		pr_debug("Can't handle BH interrupt\n");
 		return IRQ_HANDLED;
 	}
 
@@ -392,10 +388,10 @@ static int wilc_wlan_get_firmware(struct wilc *wilc)
 	int ret;
 
 	if (is_wilc3000(wilc->chipid)) {
-		pr_info("Detect chip WILC3000\n");
+		dev_dbg(wilc->dev, "Detect chip WILC3000\n");
 		firmware = WILC3000_FW();
 	} else if (is_wilc1000(wilc->chipid)) {
-		pr_info("Detect chip WILC1000\n");
+		dev_dbg(wilc->dev, "Detect chip WILC1000\n");
 		firmware = WILC1000_FW();
 	} else if (is_wilcs02(wilc->chipid)) {
 		dev_dbg(wilc->dev, "Detect chip WILCS02\n");
@@ -403,14 +399,14 @@ static int wilc_wlan_get_firmware(struct wilc *wilc)
 	} else {
 		return -EINVAL;
 	}
-	pr_info("loading firmware %s\n", firmware);
+	dev_dbg(wilc->dev, "loading firmware %s\n", firmware);
 
 	ret = request_firmware(&wilc_fw, firmware, wilc->dev);
 	if (ret != 0) {
 		if (!is_wilcs02(wilc->chipid))
 			pr_err("%s - firmware not available\n", firmware);
 		else
-			pr_err("Use pre-installed firmware for WILC-SO2 LinkController\n");
+			pr_err("use pre-installed firmware\n");
 		return -EINVAL;
 	}
 	wilc->firmware = wilc_fw;
@@ -465,16 +461,16 @@ static int wilc_firmware_download(struct wilc *wilc)
 	int ret;
 
 	if (!wilc->firmware) {
-		pr_err("Firmware buffer is NULL\n");
+		pr_err("firmware buffer invalid\n");
 		ret = -ENOBUFS;
 	}
-	pr_info("Downloading Firmware ...\n");
+	pr_debug("Downloading Firmware ...\n");
 	ret = wilc_wlan_firmware_download(wilc, wilc->firmware->data,
 					  wilc->firmware->size);
 	if (ret)
 		goto fail;
 
-	pr_info("Download Succeeded\n");
+	pr_debug("Download Succeeded\n");
 
 fail:
 	release_firmware(wilc->firmware);
@@ -784,7 +780,7 @@ int wilc_s02_reset_firmware(struct wilc *wilc, u32 type)
 					    wilc->vmm_ctl.host_vmm_tx_ctl,
 					    type);
 	if (ret)
-		pr_err("fail to write reg host_vmm_tx_ctl");
+		pr_err("%s fail [%d]\n", __func__, ret);
 
 	return ret;
 }
@@ -795,7 +791,7 @@ int wilc_s02_check_firmware_download(struct wilc *wl)
 
 	ret = wilc_wlan_get_firmware(wl);
 	if (ret) {
-		pr_err("FW file doesn't exist so proceed with pre installed image");
+		pr_err("Fw file doesn't exist, proceed with pre-programmed image");
 		return 0;
 	}
 
@@ -963,7 +959,7 @@ fail_threads:
 		wlan_deinitialize_threads(dev);
 fail_wilc_wlan:
 		wilc_wlan_cleanup(dev);
-		netdev_err(dev, "WLAN initialization FAILED\n");
+		netdev_err(dev, "WLAN initialization failed\n");
 	} else {
 		PRINT_WRN(vif->ndev, INIT_DBG, "wilc already initialized\n");
 	}

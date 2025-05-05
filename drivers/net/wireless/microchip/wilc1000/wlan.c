@@ -1053,7 +1053,7 @@ int wilc_wlan_handle_txq(struct wilc *wilc, u32 *txq_count)
 							    wilc->vmm_ctl.host_vmm_tx_ctl,
 							    WILC_S02_HOST_MALLOC);
 			if (ret) {
-				pr_err("fail write reg host_vmm_ctl");
+				pr_err("%s host_malloc failed", __func__);
 				break;
 			}
 
@@ -1348,8 +1348,7 @@ static void wilc_wlan_handle_rxq(struct wilc *wilc)
 		kfree(rqe);
 	}
 	if (wilc->quit) {
-		pr_info("%s Quitting. Exit handle RX queue\n",
-			__func__);
+		pr_debug("%s Quitting. Exit handle RX queue\n", __func__);
 		complete(&wilc->cfg_event);
 	}
 }
@@ -1490,7 +1489,8 @@ int wilc_wlan_firmware_download(struct wilc *wilc, const u8 *buffer,
 								    wilc->vmm_ctl.host_vmm_tx_ctl,
 								    WILC_S02_FW_UPGRADE | (offset << 8));
 				if (ret) {
-					pr_err("fail write reg host_vmm_ctl..\n");
+					pr_err("%s FW_UPGRADE reg failed\n",
+					       __func__);
 					ret = -EINVAL;
 					break;
 				}
@@ -1509,7 +1509,7 @@ int wilc_wlan_firmware_download(struct wilc *wilc, const u8 *buffer,
 				} while (--timeout);
 
 				if ((reg >> 1) & 0x2) {
-					pr_err("The best firmware already installed on WILCS02");
+					pr_debug("The best firmware already installed on WILCS02");
 					ret = wilc_s02_reset_firmware(wilc,
 						      WILC_S02_SOFT_RESET | (WILC_S02_WLAN_RESET << 8));
 					if (ret < 0) {
@@ -1544,7 +1544,7 @@ int wilc_wlan_firmware_download(struct wilc *wilc, const u8 *buffer,
 	} while (offset < buffer_size);
 
 	if (is_wilcs02(wilc->chipid)) {
-		pr_err("FW reset after download");
+		pr_debug("FW reset after download");
 		ret = wilc_s02_reset_firmware(wilc, WILC_S02_SOFT_RESET | (WILC_S02_FLASH_RESET << 8));
 	}
 fail:
@@ -1562,8 +1562,9 @@ int wilc_wlan_start_wilcs02_fw(struct wilc *wilc)
 					    WILC_HOST_GP_REG,
 					    (WILC_MSG_MAC_OPEN | ((reg & GENMASK(15, 0)) < 16)));
 	if (ret)
-		pr_err("fail write reg host_vmm_ctl");
-	pr_info("%s start firmware response [%d]", __func__, ret);
+		pr_err("%s GP reg write failed", __func__);
+
+	pr_debug("%s start firmware response [%d]", __func__, ret);
 
 	return ret;
 }
@@ -1628,7 +1629,7 @@ int wilc_wlan_stop(struct wilc *wilc, struct wilc_vif *vif)
 		acquire_bus(wilc, WILC_BUS_ACQUIRE_AND_WAKEUP, DEV_WIFI);
 		ret = wilc->hif_func->hif_write_reg(wilc,  WILC_HOST_GP_REG, WILC_MSG_MAC_CLOSE);
 		if (ret)
-			pr_err("fail write reg host_vmm_ctl..\n");
+			PRINT_WRN(vif->ndev, GENERIC_DBG, "GP reg failed\n");
 
 		release_bus(wilc, WILC_BUS_RELEASE_ALLOW_SLEEP, DEV_WIFI);
 		return ret;

@@ -74,20 +74,20 @@ static const struct cmd_entry cmd_table[] = {
 
 static int wilc_bt_dev_open(struct inode *i, struct file *f)
 {
-	pr_info("at_pwr_dev: open()\n");
+	pr_debug("%s called\n", __func__);
 	return 0;
 }
 
 static int wilc_bt_dev_close(struct inode *i, struct file *f)
 {
-	pr_info("at_pwr_dev: close()\n");
+	pr_debug("%s called\n", __func__);
 	return 0;
 }
 
 static ssize_t wilc_bt_dev_read(struct file *f, char __user *buf, size_t len,
 				loff_t *off)
 {
-	pr_debug("at_pwr_dev: read()\n");
+	pr_debug("%s called\n", __func__);
 	return 0;
 }
 
@@ -179,8 +179,8 @@ static void handle_cmd_cca_thrshld(char *param)
 		return;
 	}
 
-	pr_info("Changing CCA noise threshold to %d and carrier thresholds to %d\n",
-		noise_thrshld, carrier_thrshld);
+	pr_debug("Changing CCA noise threshold to %d and carrier thresholds to %d\n",
+		 noise_thrshld, carrier_thrshld);
 
 	carr_thrshld_int = carrier_thrshld/10;
 	if (carrier_thrshld < 0)
@@ -215,7 +215,7 @@ int wilc_bt_power_down(struct wilc *wilc, int source)
 	if (source == DEV_BT) {
 		u32 reg;
 
-		pr_info("AT PWR: bt_power_down\n");
+		pr_debug("%s DEV_BT\n", __func__);
 
 		/* Adjust coexistence module. This should be done from the FW
 		 * in the future
@@ -307,7 +307,7 @@ int wilc_bt_power_down(struct wilc *wilc, int source)
 
 	mutex_lock(&wilc->cs);
 
-	pr_info("source: %s, current bus status Wifi: %d, BT: %d\n",
+	pr_debug("source: %s, current bus status Wifi: %d, BT: %d\n",
 		 (source == DEV_WIFI ? "Wifi" : "BT"),
 		 wilc->power.status[DEV_WIFI],
 		 wilc->power.status[DEV_BT]);
@@ -384,10 +384,10 @@ int wilc_bt_power_up(struct wilc *wilc, int source)
 
 	if ((wilc->power.status[DEV_WIFI] == true) ||
 		   (wilc->power.status[DEV_BT] == true)) {
-		pr_info("Device already up. request source is %s\n",
+		pr_debug("Device already up. request source is %s\n",
 			 (source == DEV_WIFI ? "Wifi" : "BT"));
 	} else {
-		pr_info("WILC POWER UP\n");
+		pr_debug("WILC POWER UP\n");
 	}
 	wilc->power.status[source] = true;
 	mutex_unlock(&wilc->cs);
@@ -485,7 +485,7 @@ static void wilc_bt_firmware_download(struct wilc *wilc)
 
 	hif_func = wilc->hif_func;
 
-	pr_info("Bluetooth firmware: %s\n", FW_WILC3000_BLE);
+	pr_debug("Bluetooth firmware: %s\n", FW_WILC3000_BLE);
 	if (request_firmware(&wilc_bt_firmware, FW_WILC3000_BLE, dev) != 0) {
 		pr_err("%s - firmare not available. Skip!\n", FW_WILC3000_BLE);
 		ret = -1;
@@ -551,7 +551,7 @@ static void wilc_bt_firmware_download(struct wilc *wilc)
 		pr_err("Can't allocate buffer for BT firmware download IO error\n");
 		goto fail_1;
 	}
-	pr_info("Downloading BT firmware size = %zu ...\n", buffer_size);
+	pr_debug("Downloading BT firmware size = %zu ...\n", buffer_size);
 
 	offset = 0;
 	addr = 0x400000;
@@ -628,7 +628,7 @@ static void wilc_bt_start(struct wilc *wilc)
 
 static void handle_cmd_pwr_up(char *param)
 {
-	pr_info("AT PWR: bt_power_up\n");
+	pr_debug("%s called\n", __func__);
 	bt_init_done = 0;
 
 	if (!wilc_bt->initialized && !wilc_bt->hif_func->hif_is_init(wilc_bt)) {
@@ -661,7 +661,7 @@ static void handle_cmd_chip_allow_sleep(char *param)
 
 static void handle_cmd_download_fw(char *param)
 {
-	pr_info("AT PWR: bt_download_fw\n");
+	pr_debug("%s called\n", __func__);
 
 	wilc_bt_firmware_download(wilc_bt);
 	wilc_bt_start(wilc_bt);
@@ -676,14 +676,14 @@ static void handle_cmd_bt_enable(char *param)
 
 void wilc_bt_init(struct wilc *wilc)
 {
+	pr_debug("%s called\n", __func__);
 	wilc_bt = wilc;
-	pr_debug("at_pwr_dev: init\n");
 	wilc_bt_create_device();
 }
 
 void wilc_bt_deinit(void)
 {
-	pr_info("at_pwr_dev: deinit\n");
+	pr_debug("%s called\n", __func__);
 
 	mutex_destroy(&wilc_bt->cs);
 
@@ -692,5 +692,5 @@ void wilc_bt_deinit(void)
 	device_destroy(chc_dev_class, chc_dev_no);
 	class_destroy(chc_dev_class);
 	unregister_chrdev_region(chc_dev_no, 1);
-	pr_info("at_pwr_dev: unregistered\n");
+	pr_debug("%s done\n", __func__);
 }

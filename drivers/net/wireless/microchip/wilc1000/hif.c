@@ -797,8 +797,10 @@ static inline void host_int_parse_assoc_resp_info(struct wilc_vif *vif,
 	}
 
 	del_timer(&hif_drv->connect_timer);
-	conn_info->conn_result(CONN_DISCONN_EVENT_CONN_RESP, mac_status,
-			       hif_drv->conn_info.priv);
+
+	if (conn_info->conn_result)
+		conn_info->conn_result(CONN_DISCONN_EVENT_CONN_RESP, mac_status,
+				       hif_drv->conn_info.priv);
 
 	if (mac_status == WILC_MAC_STATUS_CONNECTED &&
 	    conn_info->status == WLAN_STATUS_SUCCESS) {
@@ -1942,7 +1944,8 @@ void wilc_gnrl_async_info_received(struct wilc *wilc, u8 *buffer, u32 length)
 	}
 
 	if (!hif_drv->conn_info.conn_result) {
-		pr_err("there is no current Connect Request\n");
+		PRINT_WRN(vif->ndev, HOSTINF_DBG,
+			  "there is no current Connect Request\n");
 		goto out;
 	}
 
