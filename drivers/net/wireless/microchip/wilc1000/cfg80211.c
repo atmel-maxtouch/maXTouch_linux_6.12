@@ -439,7 +439,8 @@ static int connect(struct wiphy *wiphy, struct net_device *dev,
 	}
 
 	if ((sme->crypto.wpa_versions & NL80211_WPA_VERSION_1) ||
-	    (sme->crypto.wpa_versions & NL80211_WPA_VERSION_2)) {
+	    (sme->crypto.wpa_versions & NL80211_WPA_VERSION_2) ||
+		(sme->crypto.wpa_versions & NL80211_WPA_VERSION_3)) {
 		for (i = 0; i < sme->crypto.n_ciphers_pairwise; i++) {
 			u32 ciphers_pairwise = sme->crypto.ciphers_pairwise[i];
 
