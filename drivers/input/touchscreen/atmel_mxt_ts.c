@@ -16,7 +16,7 @@
  *
  */
 
-#define DRIVER_VERSION_NUMBER "6.12-20250925"
+#define DRIVER_VERSION_NUMBER "6.12-20260120"
 
 #include <linux/version.h>
 #include <linux/acpi.h>
@@ -3871,26 +3871,59 @@ static int mxt_prepare_cfg_mem(struct mxt_data *data, struct mxt_cfg *cfg)
 
 		object = mxt_get_object(data, type);
 
-		/* Find first object in cfg file; if not first in device */
-		if (first_obj_type == 0 && object != NULL) {
-			first_obj_type = type;
-			first_obj_addr = object->start_address;
+		if (!object || ((mxt_object_is_volatile(data, type)) &&
+		    (instance & 0x8000) != 0x8000)) {
+			/* Skip object if not present in device or volatile */
 
-			dev_dbg(dev, "First object found T[%d]\n", type);
+			dev_dbg(dev, "Skipping object T[%d] Instance %d\n",
+				type, instance);
 
-			if (first_obj_addr > cfg->start_ofs) {
-				cfg->object_skipped_ofs = first_obj_addr -
-				cfg->start_ofs;
+			for (i = 0; i < size; i++) {
+				ret = sscanf(cfg->raw + cfg->raw_pos, "%hhx%n",
+					     &val, &offset);
+				if (ret != 1) {
+					dev_err(dev,
+						"Bad format in T%d at %d\n",
+						type, i);
+					return -EINVAL;
+				}
+				/*Update position in raw file to next obj */
+				cfg->raw_pos += offset;
 
-				dev_dbg(dev, "%s %d, %s %d, %s %d\n",
-					"cfg->skipped_ofs",
-					cfg->object_skipped_ofs,
-					"first_obj_addr",
-					first_obj_addr,
-					"cfg->start_ofs",
-					cfg->start_ofs);
+				/* Adjust byte_offset for skipped objects */
+				cfg->object_skipped_ofs =
+					cfg->object_skipped_ofs + 1;
 
-				cfg->mem_size -= cfg->object_skipped_ofs;
+				/* Adjust config memory size, less to program */
+				/* Only for non-volatile T objects */
+				if (first_obj_addr != 0) {
+					cfg->mem_size--;
+					dev_dbg(dev, "cfg->mem_size [%zu]\n",
+					cfg->mem_size);
+				}
+			}
+			continue;
+		} else {
+			/* Find first object in cfg file; if not first in device */
+			if (first_obj_type == 0 && object != NULL) {
+				cfg->object_skipped_ofs = 0;
+				first_obj_type = type;
+				first_obj_addr = object->start_address;
+
+				dev_dbg(dev, "First object found T[%d]\n", type);
+
+				if (first_obj_addr > cfg->start_ofs) {
+	
+					dev_dbg(dev, "%s %d, %s %d, %s %d\n",
+						"cfg->skipped_ofs",
+						cfg->object_skipped_ofs,
+						"first_obj_addr",
+						first_obj_addr,
+						"cfg->start_ofs",
+						cfg->start_ofs);
+
+					cfg->mem_size -= first_obj_addr;
+				}
 			}
 		}
 
@@ -3956,39 +3989,6 @@ static int mxt_prepare_cfg_mem(struct mxt_data *data, struct mxt_cfg *cfg)
 			continue;
 		}
 
-		if (!object || ((mxt_object_is_volatile(data, type)) &&
-		    (instance & 0x8000) != 0x8000)) {
-			/* Skip object if not present in device or volatile */
-
-			dev_dbg(dev, "Skipping object T[%d] Instance %d\n",
-				type, instance);
-
-			for (i = 0; i < size; i++) {
-				ret = sscanf(cfg->raw + cfg->raw_pos, "%hhx%n",
-					     &val, &offset);
-				if (ret != 1) {
-					dev_err(dev,
-						"Bad format in T%d at %d\n",
-						type, i);
-					return -EINVAL;
-				}
-				/*Update position in raw file to next obj */
-				cfg->raw_pos += offset;
-
-				/* Adjust byte_offset for skipped objects */
-				cfg->object_skipped_ofs =
-					cfg->object_skipped_ofs + 1;
-
-				/* Adjust config memory size, less to program */
-				/* Only for non-volatile T objects */
-				cfg->mem_size--;
-				dev_dbg(dev, "cfg->mem_size [%zu]\n",
-					cfg->mem_size);
-
-			}
-			continue;
-		}
-
 		if (size > mxt_obj_size(object)) {
 			/*
 			 * Either we are in fallback mode due to wrong
@@ -4020,7 +4020,7 @@ static int mxt_prepare_cfg_mem(struct mxt_data *data, struct mxt_cfg *cfg)
 
 		/* Synchronize write offset with byte_offset in cfg->mem */
 		/* Add to support missing objects within config raw file */
-		wr_offset = reg - cfg->start_ofs - cfg->object_skipped_ofs;
+		wr_offset = reg - first_obj_addr - cfg->object_skipped_ofs;
 
 		dev_dbg(dev, "%s %d, %s %d, %s %d, %s %d\n",
 			"wr_offset", wr_offset,
@@ -4080,8 +4080,9 @@ static int mxt_prepare_cfg_mem(struct mxt_data *data, struct mxt_cfg *cfg)
 					continue;
 			}
 
-			byte_offset = reg + i - cfg->start_ofs -
+			byte_offset = reg + i - first_obj_addr - 
 				cfg->object_skipped_ofs;
+
 
 			if ((byte_offset >= 0) &&
 			    (byte_offset < cfg->mem_size)) {
@@ -4480,8 +4481,7 @@ static int mxt_update_cfg(struct mxt_data *data, const struct firmware *fw)
 				break;
 
 			calculated_crc[i] = mxt_calculate_crc(&cfg.mem[i][0],
-					    0, cfg.mem_size -
-					    cfg.start_ofs, 0);
+					    0, cfg.mem_size, 0);
 
 			dev_info(dev, "Calculated cfg checksum[%d] 0x%06X\n",
 				 i, calculated_crc[i]);
@@ -6767,6 +6767,14 @@ ssize_t fw_version_show(struct device *dev,
 			 info->version >> 4, info->version & 0xf, info->build);
 }
 
+/* Return driver version as a string */
+static ssize_t drvr_version_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%s\n",
+		DRIVER_VERSION_NUMBER);
+} 
+
 static ssize_t tx_seq_number_store(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -7400,6 +7408,7 @@ static ssize_t mxt_mem_access_write(struct file *filp, struct kobject *kobj,
 
 static DEVICE_ATTR_RO(fw_version);
 static DEVICE_ATTR_RO(hw_version);
+static DEVICE_ATTR_RO(drvr_version);
 static DEVICE_ATTR_RO(objects);
 static DEVICE_ATTR_RO(crc_enabled);
 static DEVICE_ATTR_RO(debug_notify);
@@ -7422,6 +7431,7 @@ static DEVICE_ATTR(mxt_reset, 0600, reset_show, reset_store);
 static struct attribute *mxt_attrs[] = {
 	&dev_attr_fw_version.attr,
 	&dev_attr_hw_version.attr,
+	&dev_attr_drvr_version.attr,
 	&dev_attr_tx_seq_num.attr,
 	&dev_attr_debug_irq.attr,
 	&dev_attr_crc_enabled.attr,
