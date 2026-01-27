@@ -16,7 +16,7 @@
  *
  */
 
-#define DRIVER_VERSION_NUMBER "6.12-20260120"
+#define DRIVER_VERSION_NUMBER "6.12-20260123"
 
 #include <linux/version.h>
 #include <linux/acpi.h>
@@ -37,6 +37,7 @@
 #include <linux/fs.h>
 #include <linux/gpio/consumer.h>
 #include <linux/unaligned.h>
+#include <linux/minmax.h>
 #ifdef CONFIG_TOUCHSCREEN_ATMEL_MXT_T37
 #include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>
@@ -228,11 +229,6 @@
 #define T68_CMD_START		1
 #define T68_CMD_CONTINUE	2
 #define T68_CMD_END		3
-
-#define MIN(a, b) \
-	({__typeof__(a) _a = (a); \
-	__typeof__(b) _b = (b); \
-	_a < _b ? _a : _b; })
 
 #ifdef CONFIG_TOUCHSCREEN_DIAGNOSTICS_T33
 /* Define live diagnostic status bits */
@@ -1194,38 +1190,52 @@ static int mxt_bootloader_write(struct mxt_data *data,
 
 static int mxt_lookup_bootloader_address(struct mxt_data *data, bool retry)
 {
-	u8 appmode = data->client->addr;
-	u8 bootloader;
-	u8 family_id = data->info ? data->info->family_id : 0;
+	u8 bootloader = 0x4a;
+	u8 bootloader_offset;
+	u8 family_id;
+	u8 appmode;
+	int ret = 0;
+
+	family_id = (data->info != NULL) ? data->info->family_id : (u8)0;
+
+	if (data->client->addr > 0xFFU) {
+		dev_err(&data->client->dev,
+			"I2C address is too large 0x%04x\n", data->client->addr);
+		return -EINVAL;
+	}
+
+	appmode = (u8)data->client->addr;
+
+	// Determine the correct offset based on context
+	if (((appmode == 0x4aU) || (appmode == 0x4bU)) && (retry || (family_id >= 0xa2U))) {
+		bootloader_offset = 0x24U;
+	} else {
+		bootloader_offset = 0x26U;
+	}
 
 	switch (appmode) {
 	case 0x4a:
 	case 0x4b:
-		/* Chips after 1664S use different scheme */
-		if (retry || family_id >= 0xa2) {
-			bootloader = appmode - 0x24;
-			break;
-		}
-		/* Fall through for normal case */
 	case 0x4c:
 	case 0x4d:
 	case 0x5a:
 	case 0x5b:
-		bootloader = appmode - 0x26;
+		bootloader = appmode - bootloader_offset;
 		break;
 
 	default:
 		dev_err(&data->client->dev,
 			"Appmode i2c address 0x%02x not found\n",
 			appmode);
-		return -EINVAL;
+		ret = -EINVAL;
+		break;
 	}
 
 	data->bootloader_addr = bootloader;
 
 	dev_info(&data->client->dev, "Bootloader address: %x\n", bootloader);
 
-	return 0;
+	return ret;
 }
 
 static int mxt_probe_bootloader(struct mxt_data *data, bool alt_address)
@@ -6757,7 +6767,7 @@ static ssize_t config_crc_show(struct device *dev,
 }
 
 /* Firmware Version is returned as Major.Minor.Build */
-ssize_t fw_version_show(struct device *dev,
+static ssize_t fw_version_show(struct device *dev,
 				   struct device_attribute *attr, char *buf)
 {
 	struct mxt_data *data = dev_get_drvdata(dev);
