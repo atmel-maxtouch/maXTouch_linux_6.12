@@ -16,7 +16,7 @@
  *
  */
 
-#define DRIVER_VERSION_NUMBER "6.12-20260123"
+#define DRIVER_VERSION_NUMBER "6.12-20260127"
 
 #include <linux/version.h>
 #include <linux/acpi.h>
@@ -1004,8 +1004,7 @@ static int mxt_wait_for_completion(struct mxt_data *data,
 	} else if (ret == 0) {
 		dev_err(dev, "[%s] Wait for completion timed out.\n",
 			debug_msg);
-		if (comp == &data->t68_completion)	/* Return only T68 */
-			return -ETIMEDOUT;
+		return -ETIMEDOUT;
 	} else if (ret == -ERESTARTSYS) {
 		dev_warn(dev, "Completion event was interrupted\n");
 	}
@@ -1300,7 +1299,15 @@ recheck:
 		 */
 		ret = mxt_wait_for_completion(data, &data->bl_completion,
 					      MXT_FW_CHG_TIMEOUT);
-		if (ret) {
+
+		if (ret == -ETIMEDOUT) {
+			dev_err(dev, "Timer expired.\n");
+		} else if (ret == 0) {
+			dev_dbg(dev, "bl_completion done\n");
+		} else {
+			if (ret == -ERESTARTSYS) {
+				dev_info(dev, "Download interrupted\n");
+			}
 			/*
 			 * TODO: handle -ERESTARTSYS better by terminating
 			 * fw update process before returning to userspace
@@ -1310,6 +1317,8 @@ recheck:
 			dev_err(dev, "Update wait error %d\n", ret);
 			return ret;
 		}
+		if (val == MXT_FRAME_CRC_CHECK)
+			wait = true;
 	}
 
 	ret = mxt_bootloader_read(data, &val, 1);
@@ -1327,6 +1336,7 @@ recheck:
 		break;
 	case MXT_FRAME_CRC_PASS:
 		if (val == MXT_FRAME_CRC_CHECK) {
+			wait = false;
 			goto recheck;
 		} else if (val == MXT_FRAME_CRC_FAIL) {
 			dev_err(dev, "Bootloader CRC fail\n");
